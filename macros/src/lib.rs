@@ -2,10 +2,10 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, parse_macro_input, DataStruct, Data};
 
-/// Derive macro generating an impl of the trait `crate::data::Deserialize`.
+/// Derive macro generating an impl of the trait `crate::protocol::data::Deserialize`.
 /// 
 /// Do not use on enums or structs with unnamed fields (tuple structs).
-/// Every field type needs to implement `crate::Data::Deserialize`.
+/// Every field type needs to implement `crate::protocol::data::Deserialize`.
 #[proc_macro_derive(Deserialize)]
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -29,8 +29,8 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     quote!{
         #[automatically_derived]
         #[allow(unused_qualifications)]
-        impl<R: ::std::io::Read> super::data::Deserialize<R> for #typename {
-            fn deserialize(reader: &mut R) -> ::std::result::Result<Self, super::error::ProtoError> {
+        impl<R: ::std::io::Read> crate::protocol::data::Deserialize<R> for #typename {
+            fn deserialize(reader: &mut R) -> ::std::result::Result<Self, crate::protocol::error::ProtoError> {
                 Ok(
                     Self{
                         #(
