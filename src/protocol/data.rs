@@ -1,8 +1,8 @@
-use std::io::Read;
+use std::io::{Read, Write};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::{error::ProtoError, VarInt};
+use super::{error::ProtoError, varint::WriteVarIntExt, VarInt};
 
 pub trait PacketId {
     const ID: i32;
@@ -31,13 +31,15 @@ impl<R: Read> Deserialize<R> for u16 {
     }
 }
 
-// impl<R: Buf> Deserialize<R> for &str {
-//     fn deserialize(reader: &mut R) -> std::io::Result<Self> {
-//         let VarInt(size) = VarInt::deserialize(reader.reader())?;
-//         let size = size as usize;
+pub trait Serialize<W>: Sized {
+    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError>;
+}
 
-//         // reader.remaining_slice()
-//         // reader.inner
-//         todo!()
-//     }
-// }
+impl<W: Write> Serialize<W> for String {
+    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+        let len = VarInt(self.len().try_into().unwrap());
+
+        writer.write_varint(len)?;
+        writer.write_all(self.as_bytes()).map_err(Into::into)
+    }
+}

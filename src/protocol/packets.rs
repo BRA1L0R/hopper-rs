@@ -1,7 +1,7 @@
-use std::io::Read;
+use std::io::{Read, Write};
 
 use super::{
-    data::{Deserialize, PacketId},
+    data::{Deserialize, PacketId, Serialize},
     error::ProtoError,
     VarInt,
 };
@@ -25,10 +25,10 @@ impl<R: Read> Deserialize<R> for State {
 
 #[derive(Debug)]
 pub struct Handshake {
-    protocol_version: VarInt,
-    server_address: String,
-    server_port: u16,
-    next_state: State,
+    pub protocol_version: VarInt,
+    pub server_address: String,
+    pub server_port: u16,
+    pub next_state: State,
 }
 
 impl PacketId for Handshake {
@@ -50,3 +50,12 @@ impl<R: Read> Deserialize<R> for Handshake {
         })
     }
 }
+
+// impl<W: Write> Serialize<W> for Handshake {
+//     fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+//         self.protocol_version.serialize(writer)?;
+//         self.server_address.serialize(writer)?;
+//         self.server_port.serialize(writer)?;
+//         self.next_state.serialize(writer)?;
+//     }
+// }
