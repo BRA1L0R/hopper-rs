@@ -11,3 +11,4 @@ tokio = { version = "1.19", features = ["full"] }
 # serde = { version = "1.0", features = ["derive"] }
 byteorder = "1.4"
 thiserror = "1.0"
+hopper_macros = { path = "./src/macros" }

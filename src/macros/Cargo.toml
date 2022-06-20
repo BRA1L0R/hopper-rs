@@ -1,0 +1,13 @@
+[package]
+name = "hopper_macros"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Macros for internal use in hopper (https://github.com/BRA1L0R/hopper-rs)"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1.0.20"
+syn = "1.0.98"
