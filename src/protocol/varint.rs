@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::{
-    io::{Read, Write},
+    io::{Cursor, Read, Write},
     mem,
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -54,7 +54,7 @@ macro_rules! varintread {
             res |= ((current_byte.mask_data()) as i32) << (pos * 7);
 
             if current_byte.has_stop() {
-                return Ok((pos, VarInt(res)));
+                return Ok((pos + 1, VarInt(res)));
             }
         }
 
@@ -101,42 +101,17 @@ where
     }
 }
 
-struct VarIntIter(u32);
-
-impl VarIntIter {
-    pub fn new(VarInt(val): VarInt) -> Self {
-        VarIntIter(unsafe { mem::transmute(val) })
-    }
-}
-
-impl Iterator for VarIntIter {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.0 {
-            0 => None,
-            val @ 0..=0x7F => Some(val as u8),
-            val @ 0x80.. => {
-                self.0 >>= 7;
-                Some((val as u8).mask_data() | 0x80)
-            }
-        }
-    }
-}
-
 #[async_trait]
 pub trait WriteVarIntExtAsync
 where
     Self: Unpin + AsyncWrite,
 {
     // todo: rewrite in rust
-    async fn write_varint(&mut self, VarInt(val): VarInt) -> Result<usize, ProtoError> {
-        let mut buf = Vec::with_capacity(4);
-        let mut val: u32 = unsafe { mem::transmute(val) };
+    async fn write_varint(&mut self, varint: VarInt) -> Result<usize, ProtoError> {
+        let mut buf = Cursor::new([0; 4]);
+        let written = WriteVarIntExt::write_varint(&mut buf, varint).unwrap();
 
-        let written = varintwrite!(buf, val);
-
-        self.write_all(&buf)
+        self.write_all(&buf.into_inner()[..written])
             .await
             .map(|_| written)
             .map_err(Into::into)
@@ -148,12 +123,22 @@ where
     Self: Write,
 {
     fn write_varint(&mut self, VarInt(val): VarInt) -> Result<usize, ProtoError> {
-        let mut buf = Vec::with_capacity(4);
         let mut val: u32 = unsafe { mem::transmute(val) };
+        let mut written = 0;
 
-        let written = varintwrite!(buf, val);
+        loop {
+            written += 1;
+            if (val & (!0x7F)) == 0 {
+                break self
+                    .write_u8(val as u8)
+                    .map(|_| written)
+                    .map_err(Into::into);
+            }
 
-        self.write_all(&buf).map(|_| written).map_err(Into::into)
+            self.write_u8((val as u8).mask_data().add_continue())?;
+
+            val >>= 7;
+        }
     }
 }
 
@@ -180,37 +165,8 @@ impl From<VarInt> for i32 {
     }
 }
 
-// struct SeqReader<'a, A: SeqAccess<'a>>(&'a A);
-// impl<'a, A: SeqAccess<'a>> Read for SeqReader<'a, A> {
-//     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-//         todo!()
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for VarInt {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         pub struct VarIntVisitor;
-//         impl<'v> Visitor<'v> for VarIntVisitor {
-//             type Value = VarInt;
-
-//             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//                 write!(f, "properly sized varint")
-//             }
-
-//             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-//             where
-//                 A: serde::de::SeqAccess<'v>,
-//             {
-//                 SeqReader::<'v>(&seq)
-//                     .read_varint()
-//                     .map_err(Error::custom)
-//                     .map(|(_, varint)| varint)
-//             }
-//         }
-
-//         deserializer.deserialize_seq(VarIntVisitor)
-//     }
-// }
+impl From<i32> for VarInt {
+    fn from(val: i32) -> Self {
+        VarInt(val)
+    }
+}

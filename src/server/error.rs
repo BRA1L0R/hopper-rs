@@ -10,6 +10,9 @@ pub enum ServerError {
     #[error("no server")]
     NoServer,
 
+    #[error("one of the two parties terminated the connection: {0}")]
+    Disconnected(std::io::Error),
+
     #[error("unable to connect to server: {0}")]
     ServerUnreachable(std::io::Error),
 }

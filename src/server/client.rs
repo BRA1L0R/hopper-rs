@@ -1,17 +1,17 @@
-use crate::protocol::{error::ProtoError, packets::Handshake, PacketExtAsync};
+use crate::protocol::{error::ProtoError, packets::Handshake, PacketReadExtAsync};
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
 pub struct Client {
-    address: SocketAddr,
-    stream: TcpStream,
+    pub address: SocketAddr,
+    pub stream: TcpStream,
 
-    handshake: Handshake,
+    pub handshake_data: Handshake,
 }
 
 impl Client {
     pub fn destination(&self) -> &str {
-        &self.handshake.server_address
+        &self.handshake_data.server_address
     }
 
     pub async fn handshake(
@@ -25,7 +25,7 @@ impl Client {
         Ok(Client {
             address,
             stream,
-            handshake,
+            handshake_data: handshake,
         })
     }
 }

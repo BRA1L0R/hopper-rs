@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use super::{error::ProtoError, varint::WriteVarIntExt, VarInt};
 
@@ -31,7 +31,7 @@ impl<R: Read> Deserialize<R> for u16 {
     }
 }
 
-pub trait Serialize<W>: Sized {
+pub trait Serialize<W>: Sized + Send {
     fn serialize(&self, writer: &mut W) -> Result<(), ProtoError>;
 }
 
@@ -41,5 +41,11 @@ impl<W: Write> Serialize<W> for String {
 
         writer.write_varint(len)?;
         writer.write_all(self.as_bytes()).map_err(Into::into)
+    }
+}
+
+impl<W: Write> Serialize<W> for u16 {
+    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+        writer.write_u16::<BigEndian>(*self).map_err(Into::into)
     }
 }

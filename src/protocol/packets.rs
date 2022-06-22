@@ -6,10 +6,16 @@ use super::{
     VarInt,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum State {
-    Status,
-    Login,
+    Status = 1,
+    Login = 2,
+}
+
+impl<W: Write> Serialize<W> for State {
+    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+        VarInt(*self as i32).serialize(writer)
+    }
 }
 
 impl<R: Read> Deserialize<R> for State {
@@ -51,11 +57,13 @@ impl<R: Read> Deserialize<R> for Handshake {
     }
 }
 
-// impl<W: Write> Serialize<W> for Handshake {
-//     fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
-//         self.protocol_version.serialize(writer)?;
-//         self.server_address.serialize(writer)?;
-//         self.server_port.serialize(writer)?;
-//         self.next_state.serialize(writer)?;
-//     }
-// }
+impl<W: Write> Serialize<W> for Handshake {
+    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+        self.protocol_version.serialize(writer)?;
+        self.server_address.serialize(writer)?;
+        self.server_port.serialize(writer)?;
+        self.next_state.serialize(writer)?;
+
+        Ok(())
+    }
+}

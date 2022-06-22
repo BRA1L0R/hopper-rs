@@ -3,7 +3,7 @@ use self::{
     router::{Destination, Router},
 };
 use error::ServerError;
-use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::{io, net::TcpListener};
 
 mod client;
@@ -40,6 +40,19 @@ where
 
 pub struct ConfigRouter {
     routes: HashMap<String, Destination>,
+}
+
+impl ConfigRouter {
+    pub fn new() -> Self {
+        let mut routes = HashMap::new();
+
+        routes.insert(
+            String::from("localhost"),
+            Destination::new(SocketAddr::from_str("10.1.244.99:25008").unwrap()),
+        );
+
+        Self { routes }
+    }
 }
 
 impl Router for ConfigRouter {
