@@ -69,8 +69,6 @@ where
         unsafe { data.set_len(packet_len - id_size) };
         self.read_exact(&mut data).await?;
 
-        println!("{id_size}");
-
         Ok(Packet { packet_id, data })
     }
 

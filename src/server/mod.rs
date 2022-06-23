@@ -1,8 +1,8 @@
 use self::{
     client::Client,
-    router::{Destination, Router},
+    router::{Router, Server},
 };
-use error::ServerError;
+use error::HopperError;
 use std::{collections::HashMap, convert::Infallible, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::{io, net::TcpListener};
 
@@ -10,11 +10,11 @@ mod client;
 mod error;
 mod router;
 
-pub struct Server<R> {
+pub struct Hopper<R> {
     router: Arc<R>,
 }
 
-impl<R> Server<R>
+impl<R> Hopper<R>
 where
     R: 'static + Router + Sync,
 {
@@ -30,16 +30,24 @@ where
 
             tokio::spawn(async move {
                 let client = Client::handshake(client).await?;
-                let destination = router.route(&client)?;
 
-                destination.connect(client).await
+                let server_address = router.route(&client)?;
+                let server = Server::connect(server_address).await?;
+
+                log::info!(
+                    "Client {:?} accessing {} routed to {server_address:?}",
+                    client.address,
+                    client.destination()
+                );
+
+                server.bridge(client).await
             });
         }
     }
 }
 
 pub struct ConfigRouter {
-    routes: HashMap<String, Destination>,
+    routes: HashMap<String, SocketAddr>,
 }
 
 impl ConfigRouter {
@@ -48,7 +56,7 @@ impl ConfigRouter {
 
         routes.insert(
             String::from("localhost"),
-            Destination::new(SocketAddr::from_str("10.1.244.99:25008").unwrap()),
+            SocketAddr::from_str("10.1.244.99:25008").unwrap(),
         );
 
         Self { routes }
@@ -56,11 +64,11 @@ impl ConfigRouter {
 }
 
 impl Router for ConfigRouter {
-    fn route(&self, client: &Client) -> Result<Destination, ServerError> {
+    fn route(&self, client: &Client) -> Result<SocketAddr, HopperError> {
         let destination = client.destination();
         self.routes
             .get(destination)
             .copied()
-            .ok_or(ServerError::NoServer)
+            .ok_or(HopperError::NoServer)
     }
 }

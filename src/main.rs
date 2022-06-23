@@ -1,4 +1,6 @@
-use server::{ConfigRouter, Server};
+use log::LevelFilter;
+use server::{ConfigRouter, Hopper};
+use simple_logger::SimpleLogger;
 use tokio::{main, net::TcpListener};
 
 mod config;
@@ -8,9 +10,13 @@ mod server;
 pub mod protocol;
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind("0.0.0.0:25565").await?;
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .init()
+        .unwrap();
 
-    let server = Server::new(ConfigRouter::new());
+    let server = Hopper::new(ConfigRouter::new());
+    let listener = TcpListener::bind("0.0.0.0:25565").await?;
     server.listen(listener).await?;
 
     unreachable!()

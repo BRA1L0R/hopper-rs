@@ -1,6 +1,6 @@
 use crate::protocol::PacketWriteExtAsync;
 
-use super::{client::Client, error::ServerError};
+use super::{client::Client, error::HopperError};
 use std::net::SocketAddr;
 use tokio::{
     io::{copy, AsyncWriteExt},
@@ -11,25 +11,27 @@ use tokio::{
 };
 
 pub trait Router: Send + Sync {
-    fn route(&self, client: &Client) -> Result<Destination, ServerError>;
+    fn route(&self, client: &Client) -> Result<SocketAddr, HopperError>;
 }
 
-#[derive(Clone, Copy)]
-pub struct Destination(SocketAddr);
+#[derive(Debug)]
+pub struct Server(TcpStream);
 
-impl Destination {
-    pub fn new(addr: SocketAddr) -> Self {
-        Self(addr)
+impl Server {
+    pub async fn connect(addr: SocketAddr) -> Result<Self, HopperError> {
+        let server = TcpStream::connect(addr)
+            .await
+            .map_err(HopperError::ServerUnreachable)?;
+
+        Ok(Self(server))
     }
 }
 
-impl Destination {
-    pub async fn connect(self, client: Client) -> Result<(), ServerError> {
-        let mut server = TcpStream::connect(self.0)
-            .await
-            .map_err(ServerError::ServerUnreachable)?;
+impl Server {
+    pub async fn bridge(self, client: Client) -> Result<(), HopperError> {
+        let Server(mut server) = self;
 
-        server.write_serialize(client.handshake_data).await?;
+        server.write_serialize(client.data).await?;
 
         let (rc, wc) = client.stream.into_split();
         let (rs, ws) = server.into_split();
@@ -41,7 +43,7 @@ impl Destination {
         };
 
         tokio::try_join!(pipe(rc, ws), pipe(rs, wc))
-            .map_err(ServerError::Disconnected)
+            .map_err(HopperError::Disconnected)
             .map(drop)
     }
 }
