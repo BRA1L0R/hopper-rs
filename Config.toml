@@ -1,0 +1,4 @@
+listen = "0.0.0.0:25565"
+
+[routing.routes]
+localhost = "10.1.244.99:25008"

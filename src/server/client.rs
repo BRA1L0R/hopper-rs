@@ -1,7 +1,5 @@
-use crate::protocol::{
-    error::ProtoError, packets::Handshake, PacketReadExtAsync, PacketWriteExtAsync,
-};
-use std::{marker::PhantomData, net::SocketAddr};
+use crate::protocol::{error::ProtoError, packets::Handshake, PacketReadExtAsync};
+use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
 pub struct Client {
@@ -15,10 +13,10 @@ impl Client {
         &self.data.server_address
     }
 
-    pub fn disconnect(self) {
-        // match self.data.next_state {}
-        todo!()
-    }
+    // pub fn disconnect(self) {
+    //     // match self.data.next_state {}
+    //     todo!()
+    // }
 
     pub async fn handshake(
         (mut stream, address): (TcpStream, SocketAddr),
