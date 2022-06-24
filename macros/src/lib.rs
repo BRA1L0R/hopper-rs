@@ -1,30 +1,17 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{DeriveInput, parse_macro_input, DataStruct, Data};
+
+mod errors;
+#[macro_use]
+mod parser;
 
 /// Derive macro generating an impl of the trait `crate::protocol::data::Deserialize`.
-/// 
+///
 /// Do not use on enums or structs with unnamed fields (tuple structs).
 /// Every field type needs to implement `crate::protocol::data::Deserialize`.
 #[proc_macro_derive(Deserialize)]
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-
-    let fields = if let Data::Struct(DataStruct { fields: ref named, ..}) = input.data {
-        named
-    } else {
-        return r#"compile_error!("Unsupported data structure.\nDon't use enums or unnamed fields (tuple structs)")"#.parse().unwrap();
-    };
-
-    let typename = input.ident;
-
-    let mut names = Vec::with_capacity(fields.len());
-    let mut types = Vec::with_capacity(fields.len());
-
-    for x in fields {
-        names.push(x.ident.as_ref().unwrap());
-        types.push(x.ty.clone());
-    }
+    let (names, types, typename) = parse_input!(input);
 
     quote!{
         #[automatically_derived]
@@ -43,3 +30,25 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     }.into()
 }
 
+/// Derive macro generating an impl of the trait `crate::protocol::data::Serialize`.
+///
+/// Do not use on enums or structs with unnamed fields (tuple structs).
+/// Every field type needs to implement `crate::protocol::data::Serialize`.
+#[proc_macro_derive(Serialize)]
+pub fn derive_serialize(input: TokenStream) -> TokenStream {
+    let (names, _, typename) = parse_input!(input);
+
+    quote!{
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl<W: ::std::io::Write> crate::protocol::data::Serialize<W> for #typename {
+            fn serialize(&self, writer: &mut W) -> ::std::result::Result<(), crate::protocol::error::ProtoError> {
+                #(
+                    self.#names.serialize(writer)?;
+                )*
+
+                Ok(())
+            }
+        }
+    }.into()
+}
