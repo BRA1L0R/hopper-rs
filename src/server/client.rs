@@ -1,4 +1,8 @@
-use crate::protocol::{error::ProtoError, packets::Handshake, PacketReadExtAsync};
+use crate::protocol::{
+    error::ProtoError,
+    packets::{Disconnect, Handshake, State},
+    PacketReadExtAsync, PacketWriteExtAsync,
+};
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
@@ -13,10 +17,17 @@ impl Client {
         &self.data.server_address
     }
 
-    // pub fn disconnect(self) {
-    //     // match self.data.next_state {}
-    //     todo!()
-    // }
+    pub async fn disconnect(mut self, reason: impl Into<String>) {
+        if !matches!(self.data.next_state, State::Login) {
+            return;
+        }
+
+        self.stream
+            .write_serialize(Disconnect::new(reason))
+            .await
+            .ok();
+        drop(self.stream)
+    }
 
     pub async fn handshake(
         (mut stream, address): (TcpStream, SocketAddr),

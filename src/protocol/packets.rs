@@ -1,12 +1,24 @@
 use std::io::{Read, Write};
 
 use hopper_macros::{Deserialize, Serialize};
+use serde_json::json;
 
 use super::{
     data::{Deserialize, PacketId, Serialize},
     error::ProtoError,
     VarInt,
 };
+
+pub struct Chat(String);
+
+impl<W: Write> Serialize<W> for Chat {
+    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+        let chat = json!({ "text": self.0 });
+        let chat = serde_json::to_string(&chat).unwrap();
+
+        chat.serialize(writer)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum State {
@@ -43,4 +55,18 @@ impl PacketId for Handshake {
     const ID: i32 = 0x00;
 }
 
-pub struct Disconnect {}
+#[derive(Serialize)]
+pub struct Disconnect {
+    chat: Chat,
+}
+
+impl Disconnect {
+    pub fn new(reason: impl Into<String>) -> Self {
+        let chat = Chat(reason.into());
+        Self { chat }
+    }
+}
+
+impl PacketId for Disconnect {
+    const ID: i32 = 0x00;
+}

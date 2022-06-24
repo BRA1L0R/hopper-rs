@@ -1,4 +1,7 @@
-use crate::server::{Client, HopperError, Router};
+use crate::server::{
+    router::{ConnectedServer, RouterError},
+    Client, Router,
+};
 use config::{ConfigError, File};
 use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr};
@@ -16,6 +19,8 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
+    /// reads configuration from Config.toml
+    /// (more file exts can be supported through config's features)
     pub fn new() -> Result<Self, ConfigError> {
         config::Config::builder()
             .add_source(File::with_name("Config"))
@@ -26,15 +31,25 @@ impl ServerConfig {
 
 #[derive(Deserialize)]
 pub struct RouterConfig {
+    default: Option<SocketAddr>,
     routes: HashMap<String, SocketAddr>,
 }
 
+#[async_trait::async_trait]
 impl Router for RouterConfig {
-    fn route(&self, client: &Client) -> Result<SocketAddr, HopperError> {
+    async fn route(&self, client: &Client) -> Result<ConnectedServer, RouterError> {
         let destination = client.destination();
         self.routes
+            // tries to read from hashmap
             .get(destination)
+            // if not present, uses the optional default
+            .or(self.default.as_ref())
             .copied()
-            .ok_or(HopperError::NoServer)
+            // in case both return None
+            .ok_or(RouterError::NoServer)
+            // create a future which connects but does not
+            // instanciate a minecraft session
+            .map(ConnectedServer::connect)?
+            .await
     }
 }

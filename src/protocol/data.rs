@@ -35,12 +35,18 @@ pub trait Serialize<W>: Sized + Send {
     fn serialize(&self, writer: &mut W) -> Result<(), ProtoError>;
 }
 
-impl<W: Write> Serialize<W> for String {
+impl<W: Write> Serialize<W> for &str {
     fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
         let len = VarInt(self.len().try_into().unwrap());
 
         writer.write_varint(len)?;
         writer.write_all(self.as_bytes()).map_err(Into::into)
+    }
+}
+
+impl<W: Write> Serialize<W> for String {
+    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+        self.as_str().serialize(writer)
     }
 }
 

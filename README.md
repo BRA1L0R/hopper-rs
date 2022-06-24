@@ -14,10 +14,14 @@ Example `Config.toml`:
 # the address hopper will listen on
 listen = "0.0.0.0:25565"
 
+# general routing configuration
+[routing]
+default = "127.0.0.1:12345" # optional
+
 # list of servers fronted by hopper
 [routing.routes]
-mc.gaming.tk = "127.0.0.1:25008"
-other.gaming.tk = "127.0.0.1:25009"
+"mc.gaming.tk" = "127.0.0.1:25008"
+"other.gaming.tk" = "127.0.0.1:25009"
 ```
 
 ## How to run

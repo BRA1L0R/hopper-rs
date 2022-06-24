@@ -1,7 +1,8 @@
-use crate::protocol::PacketWriteExtAsync;
+use crate::{protocol::PacketWriteExtAsync, HopperError};
 
-use super::{client::Client, error::HopperError};
+use super::client::Client;
 use std::net::SocketAddr;
+use thiserror::Error;
 use tokio::{
     io::{copy, AsyncWriteExt},
     net::{
@@ -10,26 +11,46 @@ use tokio::{
     },
 };
 
+#[derive(Error, Debug)]
+pub enum RouterError {
+    #[error("no server with such hostname has been found")]
+    NoServer,
+
+    #[error("unable to connect to server: {0}")]
+    Unreachable(std::io::Error),
+}
+
+#[async_trait::async_trait]
 pub trait Router: Send + Sync {
-    fn route(&self, client: &Client) -> Result<SocketAddr, HopperError>;
+    async fn route(&self, client: &Client) -> Result<ConnectedServer, RouterError>;
 }
 
 #[derive(Debug)]
-pub struct Server(TcpStream);
+pub struct ConnectedServer(TcpStream);
 
-impl Server {
-    pub async fn connect(addr: SocketAddr) -> Result<Self, HopperError> {
+impl ConnectedServer {
+    pub async fn connect(addr: SocketAddr) -> Result<Self, RouterError> {
         let server = TcpStream::connect(addr)
             .await
-            .map_err(HopperError::ServerUnreachable)?;
+            .map_err(RouterError::Unreachable)?;
 
         Ok(Self(server))
     }
+
+    pub fn endpoint(&self) -> Result<SocketAddr, std::io::Error> {
+        self.0.peer_addr()
+    }
 }
 
-impl Server {
+impl ConnectedServer {
+    /// handshakes an already connected server and
+    /// joins two piping futures, bridging the two connections
+    /// at Layer 4.
+    ///
+    /// Note: hopper does not care what bytes are shared between
+    /// the twos
     pub async fn bridge(self, client: Client) -> Result<(), HopperError> {
-        let Server(mut server) = self;
+        let ConnectedServer(mut server) = self;
 
         server.write_serialize(client.data).await?;
 
