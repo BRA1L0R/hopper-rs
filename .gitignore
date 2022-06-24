@@ -1,4 +1,4 @@
 /target
 *bk
 routing.*
-config.*
+Config.toml

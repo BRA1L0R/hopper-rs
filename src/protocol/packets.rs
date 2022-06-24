@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 
-use hopper_macros::Deserialize;
+use hopper_macros::{Deserialize, Serialize};
 
 use super::{
     data::{Deserialize, PacketId, Serialize},
@@ -31,7 +31,7 @@ impl<R: Read> Deserialize<R> for State {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Handshake {
     pub protocol_version: VarInt,
     pub server_address: String,
@@ -43,17 +43,4 @@ impl PacketId for Handshake {
     const ID: i32 = 0x00;
 }
 
-impl<W: Write> Serialize<W> for Handshake {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
-        self.protocol_version.serialize(writer)?;
-        self.server_address.serialize(writer)?;
-        self.server_port.serialize(writer)?;
-        self.next_state.serialize(writer)?;
-
-        Ok(())
-    }
-}
-
-pub struct Disconnect {
-    
-}
+pub struct Disconnect {}
