@@ -20,9 +20,16 @@ default = "127.0.0.1:12345" # optional
 
 # list of servers fronted by hopper
 [routing.routes]
+# simple reverse proxy
 "mc.gaming.tk" = "127.0.0.1:25008"
-"other.gaming.tk" = "127.0.0.1:25009"
+
+# this will load balance between the two servers
+"other.gaming.tk" = ["127.0.0.1:25009", "10.1.0.1:25123"]
 ```
+
+# Load balancer
+
+TODO: write explaination, check config example for now
 
 ## How to run
 
