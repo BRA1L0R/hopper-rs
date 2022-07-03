@@ -17,7 +17,7 @@ use syn::{Ident, Type, DataStruct, DeriveInput, Data};
 /// In case of wrong input, it returns a compile time error.
 macro_rules! parse_input {
     ($input:ident) => {
-        if let Ok(v) = crate::parser::parse_derive_input(&syn::parse_macro_input!($input as syn::DeriveInput)) {
+        if let Ok(v) = crate::parser::parse_derive_input(syn::parse_macro_input!($input as syn::DeriveInput)) {
             v
         } else {
             return r#"compile_error!("Unsupported data structure.\nDon't use enums or unnamed fields (tuple structs)")"#.parse().unwrap();
@@ -42,9 +42,9 @@ macro_rules! parse_input {
 /// ## Error
 ///
 /// In case of wrong input, it returns crate::errors::Error::InvalidStructErr.
-pub fn parse_derive_input(input: &DeriveInput) -> Result<(Vec<Ident>, Vec<Type>, Ident), Error> {
+pub fn parse_derive_input(mut input: DeriveInput) -> Result<(Vec<Ident>, Vec<Type>, Ident), Error> {
     let fields = if let Data::Struct(DataStruct {
-        fields: ref named, ..
+        fields: ref mut named, ..
     }) = input.data
     {
         named
@@ -56,7 +56,7 @@ pub fn parse_derive_input(input: &DeriveInput) -> Result<(Vec<Ident>, Vec<Type>,
     let mut types = Vec::with_capacity(fields.len());
 
     for x in fields {
-        names.push(x.ident.clone().unwrap());
+        names.push(x.ident.take().unwrap());
         types.push(x.ty.clone());
     }
 
