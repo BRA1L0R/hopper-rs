@@ -27,12 +27,18 @@ default = "127.0.0.1:12345" # optional
 "other.gaming.tk" = ["127.0.0.1:25009", "10.1.0.1:25123"]
 ```
 
-# Load balancer
-
-TODO: write explaination, check config example for now
-
 ## How to run
 
 - TODO: cargo build explaination
 - TODO: Doker image
 - TODO: Github release
+
+## TODO
+- [ ] write `Dockerfile` and `docker-compose.yml`
+- [ ] github ci / cd with code check, build and release
+- [ ] run and build documentation in readme
+- [ ] restructure router trait structure to allow static answers (ex: for overriding motd)
+- [ ] add support for influxdb metrics (or similar)
+- [ ] rest api for metrics and operation
+- [ ] webhook callbacks for events
+- [ ] benchmark comparison with similar programs
