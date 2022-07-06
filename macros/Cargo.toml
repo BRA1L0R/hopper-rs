@@ -1,6 +1,6 @@
 [package]
 name = "hopper_macros"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT"
 description = "Macros for internal use in hopper (https://github.com/BRA1L0R/hopper-rs)"
