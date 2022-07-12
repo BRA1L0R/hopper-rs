@@ -1,5 +1,5 @@
 use crate::server::{
-    router::{ConnectedServer, RouterError},
+    router::{Bridge, RouterError},
     Client, Router,
 };
 use config::{ConfigError, File};
@@ -78,9 +78,9 @@ pub struct RouterConfig {
     routes: HashMap<String, RouteType>,
 }
 
-#[async_trait::async_trait]
+// #[async_trait::async_trait]
 impl Router for RouterConfig {
-    async fn route(&self, client: &Client) -> Result<ConnectedServer, RouterError> {
+    fn route(&self, client: &Client) -> Result<SocketAddr, RouterError> {
         let destination = client.destination();
         self.routes
             // tries to read from hashmap
@@ -88,14 +88,6 @@ impl Router for RouterConfig {
             .map(|dest| dest.get())
             // if not present, uses the optional default
             .or(self.default)
-            //     // in case both return None
             .ok_or(RouterError::NoServer)
-            // create a future which connects but does not
-            // instanciate a minecraft session
-            .map(ConnectedServer::connect)?
-            .await
-
-        // self.route
-        // todo!()
     }
 }

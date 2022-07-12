@@ -20,15 +20,15 @@ pub enum RouterError {
     Unreachable(std::io::Error),
 }
 
-#[async_trait::async_trait]
+// #[async_trait::async_trait]
 pub trait Router: Send + Sync {
-    async fn route(&self, client: &Client) -> Result<ConnectedServer, RouterError>;
+    fn route(&self, client: &Client) -> Result<SocketAddr, RouterError>;
 }
 
 #[derive(Debug)]
-pub struct ConnectedServer(TcpStream);
+pub struct Bridge(TcpStream);
 
-impl ConnectedServer {
+impl Bridge {
     pub async fn connect(addr: SocketAddr) -> Result<Self, RouterError> {
         let server = TcpStream::connect(addr)
             .await
@@ -36,13 +36,9 @@ impl ConnectedServer {
 
         Ok(Self(server))
     }
-
-    pub fn endpoint(&self) -> Result<SocketAddr, std::io::Error> {
-        self.0.peer_addr()
-    }
 }
 
-impl ConnectedServer {
+impl Bridge {
     /// handshakes an already connected server and
     /// joins two piping futures, bridging the two connections
     /// at Layer 4.
@@ -50,7 +46,7 @@ impl ConnectedServer {
     /// Note: hopper does not care what bytes are shared between
     /// the twos
     pub async fn bridge(self, client: Client) -> Result<(), HopperError> {
-        let ConnectedServer(mut server) = self;
+        let Bridge(mut server) = self;
 
         server.write_serialize(client.data).await?;
 

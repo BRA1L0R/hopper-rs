@@ -4,9 +4,12 @@ use tokio::net::TcpListener;
 mod client;
 pub mod router;
 
+use crate::protocol::error::ProtoError;
 pub use crate::HopperError;
 pub use client::Client;
 pub use router::Router;
+
+use self::router::Bridge;
 
 pub struct Hopper {
     router: Arc<dyn Router>,
@@ -30,26 +33,15 @@ impl Hopper {
                 // routes a client by reading handshake information
                 // then if a route has been found it connects to the server
                 // but does not yet send handshaking information
-                let route = router.route(&client).await;
-                let (server_address, connected_server) = match route {
-                    Ok(data) => (data.endpoint().unwrap(), data),
-                    Err(err) => {
-                        // if routing fails send a reasonable message
-                        // to the client
-                        client.disconnect(err.to_string()).await;
-                        return Err(err.into());
-                    }
+                let bridge = match router.route(&client).map(Bridge::connect) {
+                    Ok(future) => future.await,
+                    Err(err) => Err(err),
                 };
 
-                log::info!(
-                    "Client {:?} accessing {} routed to {server_address:?}",
-                    client.address,
-                    client.destination()
-                );
-
-                // send handshake to the server and bridge the two for
-                // further game communication
-                connected_server.bridge(client).await
+                match bridge {
+                    Ok(bridge) => bridge.bridge(client).await,
+                    Err(err) => Err(client.disconnect_err_chain(err).await.into()),
+                }
             };
 
             // creates a new task for each client

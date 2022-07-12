@@ -3,7 +3,7 @@ use crate::protocol::{
     packets::{Disconnect, Handshake, State},
     PacketReadExtAsync, PacketWriteExtAsync,
 };
-use std::net::SocketAddr;
+use std::{error::Error, net::SocketAddr};
 use tokio::net::TcpStream;
 
 pub struct Client {
@@ -27,6 +27,11 @@ impl Client {
             .await
             .ok();
         drop(self.stream)
+    }
+
+    pub async fn disconnect_err_chain<E: Error>(self, err: E) -> E {
+        self.disconnect(err.to_string()).await;
+        err
     }
 
     pub async fn handshake(
