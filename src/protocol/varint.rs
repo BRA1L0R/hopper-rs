@@ -1,9 +1,6 @@
 use async_trait::async_trait;
-use byteorder::{ReadBytesExt, WriteBytesExt};
-use std::{
-    io::{Cursor, Read, Write},
-    mem,
-};
+use byteorder::ReadBytesExt;
+use std::io::{Read, Write};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use super::{
@@ -65,20 +62,19 @@ macro_rules! varintread {
 macro_rules! varintwrite {
     ($buf:ident, $val:ident) => {{
         let mut written = 0;
+        std::iter::successors(Some($val), |val| Some(val >> 7))
+            .take_while(|val| *val != 0)
+            .map(|val| (val as u8).add_continue())
+            .enumerate()
+            .for_each(|(pos, val)| {
+                written = pos;
+                $buf[pos] = val
+            });
 
-        loop {
-            written += 1;
-            if ($val & (!0x7F)) == 0 {
-                WriteBytesExt::write_u8(&mut $buf, $val as u8).ok();
-                break;
-            }
+        // remove continue bit from the last element
+        $buf[written] &= 0x7F;
 
-            WriteBytesExt::write_u8(&mut $buf, ($val as u8).mask_data().add_continue()).ok();
-
-            $val >>= 7;
-        }
-
-        written
+        (&mut $buf[..=written], written + 1)
     }};
 }
 
@@ -107,11 +103,13 @@ where
     Self: Unpin + AsyncWrite,
 {
     // todo: rewrite in rust
-    async fn write_varint(&mut self, varint: VarInt) -> Result<usize, ProtoError> {
-        let mut buf = Cursor::new([0; 4]);
-        let written = WriteVarIntExt::write_varint(&mut buf, varint).unwrap();
+    async fn write_varint(&mut self, VarInt(val): VarInt) -> Result<usize, ProtoError> {
+        let val = val as u32;
+        let mut buf = [0u8; 5];
 
-        self.write_all(&buf.into_inner()[..written])
+        let (buf, written) = varintwrite!(buf, val);
+
+        self.write_all(buf)
             .await
             .map(|_| written)
             .map_err(Into::into)
@@ -123,22 +121,12 @@ where
     Self: Write,
 {
     fn write_varint(&mut self, VarInt(val): VarInt) -> Result<usize, ProtoError> {
-        let mut val: u32 = unsafe { mem::transmute(val) };
-        let mut written = 0;
+        let val = val as u32;
+        let mut buf = [0u8; 5];
 
-        loop {
-            written += 1;
-            if (val & (!0x7F)) == 0 {
-                break self
-                    .write_u8(val as u8)
-                    .map(|_| written)
-                    .map_err(Into::into);
-            }
+        let (buf, written) = varintwrite!(buf, val);
 
-            self.write_u8((val as u8).mask_data().add_continue())?;
-
-            val >>= 7;
-        }
+        self.write_all(buf).map(|_| written).map_err(Into::into)
     }
 }
 
@@ -168,5 +156,32 @@ impl From<VarInt> for i32 {
 impl From<i32> for VarInt {
     fn from(val: i32) -> Self {
         VarInt(val)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::io::Cursor;
+
+    use super::VarInt;
+    use super::WriteVarIntExt;
+
+    macro_rules! test_varint {
+        ($val:expr, $res:expr) => {
+            let mut buf = Cursor::new([0; 5]);
+            let written = buf.write_varint(VarInt($val)).unwrap();
+            assert_eq!(&buf.get_ref()[..written], $res);
+            assert_eq!(buf.position(), written as u64)
+            // assert_eq!(written, $written);
+        };
+    }
+
+    #[test]
+    fn varint_write() {
+        test_varint!(0, &[0]);
+        test_varint!(2, &[2]);
+        test_varint!(255, &[0xFF, 0x01]);
+        test_varint!(25565, &[0xDD, 0xC7, 0x01]);
+        test_varint!(-1, &[0xFF, 0xFF, 0xFF, 0xFF, 0x0F]);
     }
 }

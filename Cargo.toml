@@ -21,3 +21,4 @@ thiserror = "1.0"
 hopper_macros = { path = "./macros" }
 log = "0.4"
 simple_logger = "2.1"
+bytes = "1"

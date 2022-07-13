@@ -2,14 +2,14 @@
 pub mod data;
 pub mod error;
 pub mod packets;
-pub mod varint;
 
-use std::io::Cursor;
+pub mod varint;
+pub use varint::VarInt;
 
 use async_trait::async_trait;
-
+use bytes::BufMut;
+use std::io::Cursor;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-pub use varint::VarInt;
 
 use self::{
     data::{Deserialize, PacketId, Serialize},
@@ -54,7 +54,7 @@ impl Packet {
 #[async_trait]
 pub trait PacketReadExtAsync
 where
-    Self: AsyncRead + Unpin,
+    Self: AsyncRead + Unpin + Sized,
 {
     /// ### Read uncompressed packets
     /// this method only supports the uncompressed unencrypted
@@ -65,11 +65,19 @@ where
 
         let (id_size, packet_id) = self.read_varint().await?;
 
-        let mut data: Vec<u8> = Vec::with_capacity(packet_len - id_size);
-        unsafe { data.set_len(packet_len - id_size) };
-        self.read_exact(&mut data).await?;
+        // creates a buffer with capacity and length set to
+        // the received packet length
+        let mut data = Vec::with_capacity(packet_len - id_size).limit(packet_len - id_size);
 
-        Ok(Packet { packet_id, data })
+        // reads until the buffer is full, returns if an error occurs
+        while data.has_remaining_mut() {
+            self.read_buf(&mut data).await?;
+        }
+
+        Ok(Packet {
+            packet_id,
+            data: data.into_inner(),
+        })
     }
 
     // async fn write_packet<P: AsRef<Packet>>(&mut self, packet: P) -> Result<(), ProtoError> {
@@ -91,8 +99,6 @@ where
         let mut buf = Vec::new();
         VarInt::from(T::ID).serialize(&mut buf).unwrap();
         data.serialize(&mut buf).unwrap();
-
-        // println!("{buf:?}");
 
         let packet_len = VarInt(buf.len() as i32);
         let len_size = self.write_varint(packet_len).await?;

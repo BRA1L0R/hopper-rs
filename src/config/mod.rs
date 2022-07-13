@@ -1,9 +1,6 @@
-use crate::server::{
-    router::{Bridge, RouterError},
-    Client, Router,
-};
+use crate::server::{router::RouterError, Client, Router};
 use config::{ConfigError, File};
-use serde::{de::value::I32Deserializer, Deserialize};
+use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr, sync::Mutex};
 
 #[derive(Deserialize)]

@@ -4,7 +4,6 @@ use tokio::net::TcpListener;
 mod client;
 pub mod router;
 
-use crate::protocol::error::ProtoError;
 pub use crate::HopperError;
 pub use client::Client;
 pub use router::Router;
