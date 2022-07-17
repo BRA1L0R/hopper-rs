@@ -7,7 +7,7 @@ edition = "2021"
 
 [profile.release]
 debug = 0
-strip = "debuginfo"
+strip = "symbols"
 lto = true
 
 [dependencies]

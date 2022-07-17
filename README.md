@@ -17,6 +17,7 @@ listen = "0.0.0.0:25565"
 # general routing configuration
 [routing]
 default = "127.0.0.1:12345" # optional
+# default = ["127.0.0.1:12001", "127.0.0.1:12002"] # load balanced
 
 # list of servers fronted by hopper
 [routing.routes]

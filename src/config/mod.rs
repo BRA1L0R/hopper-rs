@@ -71,11 +71,12 @@ impl RouteType {
 
 #[derive(Deserialize)]
 pub struct RouterConfig {
-    default: Option<SocketAddr>,
+    default: Option<RouteType>,
+
+    #[serde(default)]
     routes: HashMap<String, RouteType>,
 }
 
-// #[async_trait::async_trait]
 impl Router for RouterConfig {
     fn route(&self, client: &Client) -> Result<SocketAddr, RouterError> {
         let destination = client.destination();
@@ -84,7 +85,7 @@ impl Router for RouterConfig {
             .get(destination)
             .map(|dest| dest.get())
             // if not present, uses the optional default
-            .or(self.default)
+            .or_else(|| self.default.as_ref().map(|default| default.get()))
             .ok_or(RouterError::NoServer)
     }
 }
