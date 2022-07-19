@@ -28,6 +28,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: bra1l0r/hopper-rs:latest
-          cache-from: type=registry,ref=bra1l0r/hopper-rs:buildcache
+          tags: ghcr.io/bra1l0r/hopper-rs:latest
+          cache-from: type=registry,ref=ghcr.io/bra1l0r/hopper-rs:buildcache
           cache-to: type=inline
