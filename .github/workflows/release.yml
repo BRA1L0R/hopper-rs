@@ -1,6 +1,6 @@
 name: Build and release on github
 
-on:
+on: 
   push:
     tags:
     - '*'
@@ -21,6 +21,10 @@ jobs:
             archive: zip
     steps:
       - uses: actions/checkout@master
+      - uses: ncipollo/release-action@v1
+        name: Create new Release
+        with:
+          token: ${{ secrets.YOUR_GITHUB_TOKEN }}
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.3.2
         env:
