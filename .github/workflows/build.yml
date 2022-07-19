@@ -31,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Compile binary
+        id: compile
         uses: rust-build/rust-build.action@v1.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
