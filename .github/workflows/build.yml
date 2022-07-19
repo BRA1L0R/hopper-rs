@@ -1,0 +1,47 @@
+name: Build and release on github
+
+on: 
+  push:
+    tags:
+    - '*'
+jobs:
+  tagging:
+    name: Create release tag
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@master
+      - uses: ncipollo/release-action@v1
+        name: Create new Release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+  build:
+    name: release ${{ matrix.target }}
+    runs-on: self-hosted
+    needs: tagging
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+            archive: zip
+          - target: x86_64-unknown-linux-musl
+            archive: tar.gz tar.xz
+          - target: x86_64-apple-darwin
+            archive: zip
+    steps:
+      - uses: actions/checkout@master
+      - name: Compile binary
+        id: compile
+        uses: rust-build/rust-build.action@v1.3.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          RUSTTARGET: ${{ matrix.target }}
+          ARCHIVE_TYPES: ${{ matrix.archive }}
+          UPLOAD_MODE: none
+      - name: Upload artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ steps.compile.outputs.BUILT_ARCHIVE }}
+            ${{ steps.compile.outputs.BUILT_CHECKSUM }}
