@@ -1,15 +1,23 @@
 name: Build and release on github
 
-on:
-  workflow_run:
-    workflows: ["Create release tag"]
-    branches: [master]
-    types: 
-      - completed
+on: 
+  push:
+    tags:
+    - '*'
 jobs:
-  release:
+  tagging:
+    name: Create release tag
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@master
+      - uses: ncipollo/release-action@v1
+        name: Create new Release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+  build:
     name: release ${{ matrix.target }}
     runs-on: self-hosted
+    needs: tagging
     strategy:
       fail-fast: false
       matrix:
