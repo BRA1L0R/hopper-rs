@@ -34,7 +34,7 @@ There are two ways to run hopper:
 - Using the [docker image](#docker)
 - Using the [binaries](#binaries)
 
-### Docker
+### Docker ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/bra1l0r/hopper-rs/Docker%20build%20and%20registry%20push?label=Container%20Build&style=flat-square)
 
 - Pull the latest image from the GitHub registry:
 ```sh
@@ -61,11 +61,9 @@ services:
       - ./Config.toml:/Config.toml
 ```
 
-### Binary
+### Binary ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/bra1l0r/hopper-rs/Build%20and%20release%20on%20github?label=Artifact%20Release&style=flat-square)
 
-You can either build the latest commit or download the [latest release](https://github.com/BRA1L0R/hopper-rs/releases)
-
-#### BIY (Build-It-Yourself):
+You can either download the [latest release](https://github.com/BRA1L0R/hopper-rs/releases) **(recommended)** or follow the steps below to build your own binary:
 
 - Download and install the latest version of the rustc toolchain
 - Clone and build the repo:
@@ -79,15 +77,14 @@ cargo build --release
 ``` 
 - The runnable binary will now be available at `target/release/hopper`
 
-#### Running the binary
-
-TODO: running
+TODO: running information with systemd configuration example
 
 ## TODO
 
 - [x] write `Dockerfile` and `docker-compose.yml`
 - [x] github ci / cd with code check, build and release
-- [x] run and build documentation in readme
+- [x] build documentation
+- [x] run documentation in readme
 - [x] restructure router trait
 - [ ] add support for influxdb metrics (or similar)
 - [ ] rest api for metrics and operation
