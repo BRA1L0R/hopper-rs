@@ -1,5 +1,4 @@
 name: Docker build and registry push
-runs-on: self-hosted
 
 on:
   push:
@@ -8,7 +7,7 @@ on:
 
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       -
         name: Checkout
