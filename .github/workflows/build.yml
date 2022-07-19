@@ -1,5 +1,4 @@
 name: Build and release on github
-runs-on: self-hosted
 
 on:
   push:

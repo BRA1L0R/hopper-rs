@@ -30,4 +30,4 @@ jobs:
           push: true
           tags: bra1l0r/hopper:latest
           cache-from: type=registry,ref=bra1l0r/hopper:buildcache
-          cache-to: type=registry,ref=bra1l0r/hopper:buildcache,mode=max
+          cache-to: type=inline
