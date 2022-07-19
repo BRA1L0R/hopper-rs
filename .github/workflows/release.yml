@@ -24,7 +24,7 @@ jobs:
       - uses: ncipollo/release-action@v1
         name: Create new Release
         with:
-          token: ${{ secrets.YOUR_GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.3.2
         env:
