@@ -1,7 +1,9 @@
-use crate::server::{router::RouterError, Client, Router};
+use crate::server::{bridge::Bridge, router::RouterError, Client, Router};
+use async_trait::async_trait;
 use config::{ConfigError, File};
-use serde::Deserialize;
-use std::{collections::HashMap, net::SocketAddr, sync::Mutex};
+use serde::{Deserialize, Deserializer};
+use std::{collections::HashMap, net::SocketAddr};
+use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 /// Defines the structure of a config file. Extension can be
@@ -53,18 +55,27 @@ impl Balanced {
     }
 }
 
+fn deserialize_mutex<'de, D, T: Deserialize<'de>>(deserializer: D) -> Result<Mutex<T>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let inner = T::deserialize(deserializer)?;
+    Ok(Mutex::new(inner))
+}
+
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum RouteType {
     Simple(SocketAddr),
+    #[serde(deserialize_with = "deserialize_mutex")]
     Balanced(Mutex<Balanced>),
 }
 
 impl RouteType {
-    fn get(&self) -> SocketAddr {
+    async fn get(&self) -> SocketAddr {
         match self {
             RouteType::Simple(route) => *route,
-            RouteType::Balanced(balancer) => balancer.lock().unwrap().get(),
+            RouteType::Balanced(balancer) => balancer.lock().await.get(),
         }
     }
 }
@@ -77,15 +88,16 @@ pub struct RouterConfig {
     routes: HashMap<String, RouteType>,
 }
 
+#[async_trait]
 impl Router for RouterConfig {
-    fn route(&self, client: &Client) -> Result<SocketAddr, RouterError> {
+    async fn route(&self, client: &Client) -> Result<Bridge, RouterError> {
         let destination = client.destination();
-        self.routes
-            // tries to read from hashmap
+        let route = self
+            .routes
             .get(destination)
-            .map(|dest| dest.get())
-            // if not present, uses the optional default
-            .or_else(|| self.default.as_ref().map(|default| default.get()))
-            .ok_or(RouterError::NoServer)
+            .or(self.default.as_ref())
+            .ok_or(RouterError::NoServer)?;
+
+        Bridge::connect(route.get().await).await
     }
 }

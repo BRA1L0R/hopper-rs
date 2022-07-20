@@ -31,8 +31,8 @@ default = "127.0.0.1:12345" # optional
 ## How to run
 
 There are two ways to run hopper:
-- Using the [docker image](#docker)
-- Using the [binaries](#binaries)
+- Using the [docker image](#docker-)
+- Using the [binaries](#binary-)
 
 ### Docker ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/bra1l0r/hopper-rs/Docker%20build%20and%20registry%20push?label=Container%20Build&style=flat-square)
 

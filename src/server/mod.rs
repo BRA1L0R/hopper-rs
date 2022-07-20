@@ -1,14 +1,13 @@
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
+pub mod bridge;
 mod client;
 pub mod router;
 
 pub use crate::HopperError;
 pub use client::Client;
 pub use router::Router;
-
-use self::router::Bridge;
 
 pub struct Hopper {
     router: Arc<dyn Router>,
@@ -21,6 +20,8 @@ impl Hopper {
     }
 
     pub async fn listen(&self, listener: TcpListener) -> ! {
+        log::info!("Listening on {}", listener.local_addr().unwrap());
+
         loop {
             let client = listener.accept().await.unwrap();
             let router = self.router.clone();
@@ -32,14 +33,15 @@ impl Hopper {
                 // routes a client by reading handshake information
                 // then if a route has been found it connects to the server
                 // but does not yet send handshaking information
-                let bridge = match router.route(&client).map(Bridge::connect) {
-                    Ok(future) => future.await,
-                    Err(err) => Err(err),
-                };
-
-                match bridge {
-                    Ok(bridge) => bridge.bridge(client).await,
-                    Err(err) => Err(client.disconnect_err_chain(err).await.into()),
+                match router.route(&client).await {
+                    Ok(bridge) => {
+                        log::info!("{client} connected to {}", bridge.address()?);
+                        bridge.bridge(client).await
+                    }
+                    Err(err) => {
+                        log::error!("Couldn't connect {client}: {err}");
+                        Err(client.disconnect_err_chain(err).await.into())
+                    }
                 }
             };
 

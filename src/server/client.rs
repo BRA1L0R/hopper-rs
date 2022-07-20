@@ -3,7 +3,7 @@ use crate::protocol::{
     packets::{Disconnect, Handshake, State},
     PacketReadExtAsync, PacketWriteExtAsync,
 };
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, fmt::Display, net::SocketAddr};
 use tokio::net::TcpStream;
 
 pub struct Client {
@@ -47,5 +47,17 @@ impl Client {
             stream,
             data,
         })
+    }
+}
+
+impl Display for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}=>{} ({:?})",
+            self.address,
+            self.destination(),
+            self.data.next_state
+        )
     }
 }
