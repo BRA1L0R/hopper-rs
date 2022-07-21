@@ -12,7 +12,9 @@ NOTE: this proxy is still heavily under development, and a lot of [new features]
 - [x] Load balancing
 - [x] [IP Forwarding](#ip-forwarding)
 - [ ] Webhook callbacks for events
-- [ ] support for influxdb metrics
+- [ ] Logging metrics on InfluxDB
+- [ ] Rest api for metrics and operation
+- [ ] Plugin system for Docker and hosting provider integrations
 
 ## Configuration
 
@@ -102,10 +104,3 @@ cargo build --release
 - The runnable binary will now be available at `target/release/hopper`
 
 TODO: running information with systemd configuration example
-
-## Upcoming features
-
-- [ ] add support for influxdb metrics (or similar)
-- [ ] rest api for metrics and operation
-- [ ] webhook callbacks for events
-- [ ] benchmark comparison with similar programs
