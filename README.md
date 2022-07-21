@@ -35,7 +35,7 @@ default = { ip = "127.0.0.1:12345" } # optional
 "mc.gaming.tk" = { ip = "127.0.0.1:25008" }
 
 # bungeecord's ip forwarding feature enabled
-"mc.server.com" = { ip-forwarding = true, ip "127.0.0.1:25123" }
+"mc.server.com" = { ip-forwarding = "bungeecord", ip "127.0.0.1:25123" }
 
 # this will load balance between the two servers
 "other.gaming.tk" = ["127.0.0.1:25009", "10.1.0.1:25123"]
@@ -50,7 +50,7 @@ Without IP Forwarding, when servers receive connections from this reverse proxy 
 You can enable ip forwarding per-server on hopper with the "ip-forwarding" directive like this:
 ```toml
 [routing.routes."your.hostname.com"]
-ip-forwarding = true # defaults to false
+ip-forwarding = "bungeecord" # available options are: bungeecord, none. Defaults to none
 ip = "<your server ip>"
 ```
 

@@ -5,6 +5,7 @@ use crate::{
 };
 
 use super::{client::IncomingClient, router::RouterError};
+use serde::Deserialize;
 use std::net::SocketAddr;
 use tokio::{
     io::{copy, AsyncWriteExt},
@@ -14,9 +15,13 @@ use tokio::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default, Deserialize, Clone, Copy)]
 pub enum ForwardStrategy {
+    #[default]
+    #[serde(rename = "none")]
     None,
+
+    #[serde(rename = "bungeecord")]
     BungeeCord,
 }
 

@@ -12,6 +12,10 @@ use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::sync::Mutex;
 
+use self::balancer::Balanced;
+
+mod balancer;
+
 #[derive(Deserialize)]
 /// Defines the structure of a config file. Extension can be
 pub struct ServerConfig {
@@ -32,34 +36,6 @@ impl ServerConfig {
             .add_source(File::with_name("Config"))
             .build()?
             .try_deserialize()
-    }
-}
-
-#[derive(Debug)]
-struct Balanced {
-    servers: Vec<SocketAddr>,
-    last_used: usize,
-}
-
-impl<'de> Deserialize<'de> for Balanced {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let servers = Vec::deserialize(deserializer)?;
-        Ok(Self {
-            servers,
-            last_used: Default::default(),
-        })
-    }
-}
-
-impl Balanced {
-    fn get(&mut self) -> SocketAddr {
-        let item = self.servers[self.last_used];
-        self.last_used = (self.last_used + 1) % self.servers.len();
-
-        item
     }
 }
 
@@ -91,7 +67,7 @@ impl RouteType {
 #[derive(Deserialize)]
 pub struct RouteInfo {
     #[serde(alias = "ip-forwarding", default)]
-    ip_forwarding: bool,
+    ip_forwarding: ForwardStrategy,
 
     ip: RouteType,
 }
@@ -114,11 +90,6 @@ impl Router for RouterConfig {
             .or(self.default.as_ref())
             .ok_or(RouterError::NoServer)?;
 
-        let forwarding = match route.ip_forwarding {
-            false => ForwardStrategy::None,
-            true => ForwardStrategy::BungeeCord,
-        };
-
-        Bridge::connect(route.ip.get().await, forwarding).await
+        Bridge::connect(route.ip.get().await, route.ip_forwarding).await
     }
 }
