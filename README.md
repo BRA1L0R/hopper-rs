@@ -8,6 +8,12 @@ Hopper works starting from version **1.7** up to the **latest** version of Minec
 
 NOTE: this proxy is still heavily under development, and a lot of [new features](#upcoming-features) are coming really soon!
 
+**FEATURES:**
+- [x] Load balancing
+- [x] [IP Forwarding](#ip-forwarding)
+- [ ] Webhook callbacks for events
+- [ ] support for influxdb metrics
+
 ## Configuration
 
 Example `Config.toml`:
