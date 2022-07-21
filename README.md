@@ -6,6 +6,8 @@
 
 Hopper works starting from version **1.7** up to the **latest** version of Minecraft.
 
+NOTE: this proxy is still heavily under development, and a lot of [new features](#upcoming-features) are coming really soon!
+
 ## Configuration
 
 Example `Config.toml`:
@@ -16,16 +18,32 @@ listen = "0.0.0.0:25565"
 
 # general routing configuration
 [routing]
-default = "127.0.0.1:12345" # optional
-# default = ["127.0.0.1:12001", "127.0.0.1:12002"] # load balanced
+default = { ip = "127.0.0.1:12345" } # optional
+# default = { ip = ["127.0.0.1:12001", "127.0.0.1:12002"] } # load balanced
 
 # list of servers fronted by hopper
 [routing.routes]
 # simple reverse proxy
-"mc.gaming.tk" = "127.0.0.1:25008"
+"mc.gaming.tk" = { ip = "127.0.0.1:25008" }
+
+# bungeecord's ip forwarding feature enabled
+"mc.server.com" = { ip-forwarding = true, ip "127.0.0.1:25123" }
 
 # this will load balance between the two servers
 "other.gaming.tk" = ["127.0.0.1:25009", "10.1.0.1:25123"]
+```
+
+### IP Forwarding
+
+Without IP Forwarding, when servers receive connections from this reverse proxy they won't see the original client's ip address. This may lead to problems with sessions with plugins such as Authme. Hopper implements the same "protocol" BungeeCord uses (old but very compatible with all Minecraft versions).
+
+⚠️ Note: you will also need to enable the bungeecord directive in your server's configuration files. [Click here](https://shockbyte.com/billing/knowledgebase/38/IP-Forwarding-in-BungeeCord.html) to learn more.
+
+You can enable ip forwarding per-server on hopper with the "ip-forwarding" directive like this:
+```toml
+[routing.routes."your.hostname.com"]
+ip-forwarding = true # defaults to false
+ip = "<your server ip>"
 ```
 
 ## How to run
@@ -79,13 +97,8 @@ cargo build --release
 
 TODO: running information with systemd configuration example
 
-## TODO
+## Upcoming features
 
-- [x] write `Dockerfile` and `docker-compose.yml`
-- [x] github ci / cd with code check, build and release
-- [x] build documentation
-- [x] run documentation in readme
-- [x] restructure router trait
 - [ ] add support for influxdb metrics (or similar)
 - [ ] rest api for metrics and operation
 - [ ] webhook callbacks for events

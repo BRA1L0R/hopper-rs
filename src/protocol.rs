@@ -3,8 +3,10 @@ pub mod data;
 pub mod error;
 pub mod packets;
 
+pub mod uuid;
 pub mod varint;
 pub use varint::VarInt;
+pub mod lazy;
 
 use async_trait::async_trait;
 use bytes::BufMut;
@@ -14,7 +16,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use self::{
     data::{Deserialize, PacketId, Serialize},
     error::ProtoError,
-    varint::{ReadVarIntExtAsync, WriteVarIntExtAsync},
+    varint::{ReadVarIntExtAsync, WriteVarIntExt, WriteVarIntExtAsync},
 };
 
 #[derive(Debug)]
@@ -26,6 +28,10 @@ pub struct Packet {
 impl Packet {
     fn data_cursor(&self) -> Cursor<&[u8]> {
         Cursor::new(&self.data)
+    }
+
+    fn is<T: PacketId>(&self) -> bool {
+        self.packet_id == T::ID
     }
 
     pub fn serialize<T>(packet: &T) -> Result<Self, ProtoError>
@@ -41,9 +47,9 @@ impl Packet {
         })
     }
 
-    pub fn deserialize_owned<'a, T>(&'a self) -> Result<T, ProtoError>
+    pub fn deserialize_owned<T>(&self) -> Result<T, ProtoError>
     where
-        T: Deserialize<Cursor<&'a [u8]>> + PacketId,
+        T: for<'a> Deserialize<Cursor<&'a [u8]>> + PacketId + 'static,
     {
         (self.packet_id == T::ID)
             .then(|| T::deserialize(&mut self.data_cursor()))
@@ -91,6 +97,26 @@ pub trait PacketWriteExtAsync
 where
     Self: AsyncWrite + Unpin,
 {
+    async fn write_packet(
+        &mut self,
+        packet: impl AsRef<Packet> + Send,
+    ) -> Result<usize, ProtoError> {
+        let packet = packet.as_ref();
+
+        // store temporarily the packet id to calculate its length
+        let mut packetid = Vec::with_capacity(5); // TODO: replace with stack buffer
+        let pid_len = WriteVarIntExt::write_varint(&mut packetid, packet.packet_id).unwrap();
+
+        let packet_len = VarInt((pid_len + packet.data.len()) as i32);
+
+        // write the packet
+        let plen_length = self.write_varint(packet_len).await?;
+        self.write_all(&packetid).await?;
+        self.write_all(&packet.data).await?;
+
+        Ok(plen_length + pid_len + packet.data.len())
+    }
+
     // efficient in-place serialization
     async fn write_serialize<T>(&mut self, data: T) -> Result<usize, ProtoError>
     where

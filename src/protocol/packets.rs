@@ -55,6 +55,15 @@ impl PacketId for Handshake {
     const ID: i32 = 0x00;
 }
 
+#[derive(Debug, Deserialize)]
+pub struct LoginStart {
+    pub username: String,
+}
+
+impl PacketId for LoginStart {
+    const ID: i32 = 0x00;
+}
+
 #[derive(Serialize)]
 pub struct Disconnect {
     chat: Chat,

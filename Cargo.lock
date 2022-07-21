@@ -78,7 +78,7 @@ dependencies = [
 
 [[package]]
 name = "hopper"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -86,11 +86,13 @@ dependencies = [
  "config",
  "hopper_macros",
  "log",
+ "md5",
  "serde",
  "serde_json",
  "simple_logger",
  "thiserror",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -127,6 +129,12 @@ checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
+
+[[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"
@@ -369,6 +377,12 @@ name = "unicode-ident"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bd2fe26506023ed7b5e1e315add59d6f584c621d037f9368fea9cfb988f368c"
+
+[[package]]
+name = "uuid"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
 
 [[package]]
 name = "wasi"

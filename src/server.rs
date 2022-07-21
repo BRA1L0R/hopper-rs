@@ -6,7 +6,7 @@ mod client;
 pub mod router;
 
 pub use crate::HopperError;
-pub use client::Client;
+pub use client::IncomingClient;
 pub use router::Router;
 
 pub struct Hopper {
@@ -28,12 +28,13 @@ impl Hopper {
 
             let handler = async move {
                 // receives a handshake from the client and decodes its information
-                let client = Client::handshake(client).await?;
+                let mut client = IncomingClient::handshake(client).await?;
+                let handshake = client.handshake.data()?;
 
                 // routes a client by reading handshake information
                 // then if a route has been found it connects to the server
                 // but does not yet send handshaking information
-                match router.route(&client).await {
+                match router.route(handshake).await {
                     Ok(bridge) => {
                         log::info!("{client} connected to {}", bridge.address()?);
                         bridge.bridge(client).await

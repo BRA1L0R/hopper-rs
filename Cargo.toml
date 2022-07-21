@@ -1,7 +1,8 @@
 [package]
 name = "hopper"
-version = "0.2.4"
+version = "0.3.0"
 edition = "2021"
+
 
 [profile.release]
 debug = 0
@@ -20,3 +21,5 @@ hopper_macros = { path = "./macros" }
 log = "0.4"
 simple_logger = "2.1"
 bytes = "1"
+uuid = { version = "1.1" }
+md5 = { version = "0.7" } 

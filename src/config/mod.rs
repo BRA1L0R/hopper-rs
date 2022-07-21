@@ -1,4 +1,11 @@
-use crate::server::{bridge::Bridge, router::RouterError, Client, Router};
+use crate::{
+    protocol::packets::Handshake,
+    server::{
+        bridge::{Bridge, ForwardStrategy},
+        router::RouterError,
+        Router,
+    },
+};
 use async_trait::async_trait;
 use config::{ConfigError, File};
 use serde::{Deserialize, Deserializer};
@@ -28,6 +35,7 @@ impl ServerConfig {
     }
 }
 
+#[derive(Debug)]
 struct Balanced {
     servers: Vec<SocketAddr>,
     last_used: usize,
@@ -63,7 +71,7 @@ where
     Ok(Mutex::new(inner))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum RouteType {
     Simple(SocketAddr),
@@ -81,23 +89,36 @@ impl RouteType {
 }
 
 #[derive(Deserialize)]
+pub struct RouteInfo {
+    #[serde(alias = "ip-forwarding", default)]
+    ip_forwarding: bool,
+
+    ip: RouteType,
+}
+
+#[derive(Deserialize)]
 pub struct RouterConfig {
-    default: Option<RouteType>,
+    default: Option<RouteInfo>,
 
     #[serde(default)]
-    routes: HashMap<String, RouteType>,
+    routes: HashMap<String, RouteInfo>,
 }
 
 #[async_trait]
 impl Router for RouterConfig {
-    async fn route(&self, client: &Client) -> Result<Bridge, RouterError> {
-        let destination = client.destination();
+    async fn route(&self, handshake: &Handshake) -> Result<Bridge, RouterError> {
+        let destination = &handshake.server_address;
         let route = self
             .routes
             .get(destination)
             .or(self.default.as_ref())
             .ok_or(RouterError::NoServer)?;
 
-        Bridge::connect(route.get().await).await
+        let forwarding = match route.ip_forwarding {
+            false => ForwardStrategy::None,
+            true => ForwardStrategy::BungeeCord,
+        };
+
+        Bridge::connect(route.ip.get().await, forwarding).await
     }
 }

@@ -1,24 +1,31 @@
 use crate::protocol::{
     error::ProtoError,
-    packets::{Disconnect, Handshake, State},
+    lazy::LazyPacket,
+    packets::{Disconnect, Handshake, LoginStart, State},
     PacketReadExtAsync, PacketWriteExtAsync,
 };
-use std::{error::Error, fmt::Display, net::SocketAddr};
+use std::{error::Error, net::SocketAddr};
 use tokio::net::TcpStream;
 
-pub struct Client {
-    pub address: SocketAddr,
-    pub stream: TcpStream,
-    pub data: Handshake,
+pub enum NextState {
+    Login(LazyPacket<LoginStart>),
+    Status,
 }
 
-impl Client {
-    pub fn destination(&self) -> &str {
-        &self.data.server_address
-    }
+pub struct IncomingClient {
+    pub address: SocketAddr,
+    pub stream: TcpStream,
 
+    pub handshake: LazyPacket<Handshake>,
+    pub next_state: NextState,
+}
+
+impl IncomingClient {
     pub async fn disconnect(mut self, reason: impl Into<String>) {
-        if !matches!(self.data.next_state, State::Login) {
+        if !matches!(
+            self.handshake.data().map(|data| data.next_state),
+            Ok(State::Login)
+        ) {
             return;
         }
 
@@ -37,27 +44,26 @@ impl Client {
     pub async fn handshake(
         (mut stream, address): (TcpStream, SocketAddr),
     ) -> Result<Self, ProtoError> {
-        let data = stream
-            .read_packet()
-            .await?
-            .deserialize_owned::<Handshake>()?;
+        let mut handshake: LazyPacket<Handshake> = stream.read_packet().await?.try_into()?;
 
-        Ok(Client {
+        // only read LoginStart information (containing the username)
+        // if the next_state is login
+        let next_state = match handshake.data()?.next_state {
+            State::Status => NextState::Status,
+            State::Login => NextState::Login(stream.read_packet().await?.try_into()?),
+        };
+
+        Ok(IncomingClient {
             address,
             stream,
-            data,
+            handshake,
+            next_state,
         })
     }
 }
 
-impl Display for Client {
+impl std::fmt::Display for IncomingClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}=>{} ({:?})",
-            self.address,
-            self.destination(),
-            self.data.next_state
-        )
+        write!(f, "{}", self.address)
     }
 }
