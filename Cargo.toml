@@ -3,6 +3,8 @@ name = "hopper"
 version = "0.3.2"
 edition = "2021"
 
+[features]
+buffered = []
 
 [profile.release]
 debug = 0

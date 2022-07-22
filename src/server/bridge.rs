@@ -1,5 +1,5 @@
 use crate::{
-    protocol::{uuid::Uuid, PacketWriteExtAsync},
+    protocol::{uuid::PlayerUuid, PacketWriteExtAsync},
     server::client::NextState,
     HopperError,
 };
@@ -14,6 +14,9 @@ use tokio::{
         TcpStream,
     },
 };
+
+#[cfg(feature = "buffered")]
+use tokio::io::{BufReader, BufWriter};
 
 #[derive(Debug, Default, Deserialize, Clone, Copy)]
 pub enum ForwardStrategy {
@@ -84,7 +87,7 @@ impl Bridge {
                 // calculate the player's offline UUID. It will get
                 // ignored by online-mode servers so we can always send
                 // it even when the server is premium-only
-                let uuid = Uuid::offline_player(&logindata.username);
+                let uuid = PlayerUuid::offline_player(&logindata.username);
 
                 // https://github.com/SpigotMC/BungeeCord/blob/8d494242265790df1dc6d92121d1a37b726ac405/proxy/src/main/java/net/md_5/bungee/ServerConnector.java#L91-L106
                 handshake.server_address = format!(
@@ -94,6 +97,8 @@ impl Bridge {
                     uuid
                 );
 
+                println!("{handshake:?} {logindata:?} {uuid}");
+
                 stream.write_serialize(handshake).await?;
                 stream.write_packet(login).await?
             }
@@ -102,6 +107,13 @@ impl Bridge {
         let (rc, wc) = client.stream.into_split();
         let (rs, ws) = stream.into_split();
 
+        #[cfg(feature = "buffered")]
+        let pipe = |mut input: BufReader<OwnedReadHalf>, mut output: BufWriter<OwnedWriteHalf>| async move {
+            copy(&mut input, &mut output).await?;
+            output.shutdown().await
+        };
+
+        #[cfg(not(feature = "buffered"))]
         let pipe = |mut input: OwnedReadHalf, mut output: OwnedWriteHalf| async move {
             copy(&mut input, &mut output).await?;
             output.shutdown().await
@@ -109,9 +121,16 @@ impl Bridge {
 
         // create two futures, one that copies server->client and the other client->server
         // then join them together to make them work on the same task concurrently
-        tokio::try_join!(pipe(rc, ws), pipe(rs, wc))
-            .map_err(HopperError::Disconnected)
-            // match the function return signature
-            .map(drop)
+        #[cfg(feature = "buffered")]
+        tokio::try_join!(
+            pipe(BufReader::new(rc), BufWriter::new(ws)),
+            pipe(BufReader::new(rs), BufWriter::new(wc))
+        )
+        .map_err(HopperError::Disconnected)?;
+
+        #[cfg(not(feature = "buffered"))]
+        tokio::try_join!(pipe(rc, ws), pipe(rs, wc)).map_err(HopperError::Disconnected)?;
+
+        Ok(())
     }
 }

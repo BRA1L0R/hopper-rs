@@ -1,17 +1,23 @@
 use std::fmt::Display;
 
-pub struct Uuid(uuid::Uuid);
+pub struct PlayerUuid(uuid::Uuid);
 
-impl Uuid {
-    pub fn offline_player(player_name: &str) -> Uuid {
-        let hash = md5::compute(format!("OfflinePlayer:{player_name}"));
+impl PlayerUuid {
+    pub fn offline_player(player_name: &str) -> PlayerUuid {
+        let mut hash = md5::compute(format!("OfflinePlayer:{player_name}"));
+
+        // set UUID version to 3
+        hash[6] = hash[6] & 0x0f | 0x30;
+        // IETF variant
+        hash[8] = hash[8] & 0x3f | 0x80;
+
         let uuid = uuid::Uuid::from_bytes(hash.0);
 
-        Uuid(uuid)
+        PlayerUuid(uuid)
     }
 }
 
-impl Display for Uuid {
+impl Display for PlayerUuid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
