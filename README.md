@@ -6,7 +6,7 @@
 
 Hopper works starting from version **1.7** up to the **latest** version of Minecraft.
 
-NOTE: this proxy is still heavily under development, and a lot of [new features](#upcoming-features) are coming really soon!
+NOTE: this proxy is still heavily under development, and a lot of new features are coming really soon!
 
 **FEATURES:**
 - [x] Load balancing
