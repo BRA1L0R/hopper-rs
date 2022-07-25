@@ -89,6 +89,13 @@ impl Bridge {
                 // it even when the server is premium-only
                 let uuid = PlayerUuid::offline_player(&logindata.username);
 
+                // if handshake contains a null character it means that
+                // someone is trying to hijack the connection or trying to
+                // connect through another proxy
+                if handshake.server_address.contains('\x00') {
+                    return Err(HopperError::Invalid);
+                }
+
                 // https://github.com/SpigotMC/BungeeCord/blob/8d494242265790df1dc6d92121d1a37b726ac405/proxy/src/main/java/net/md_5/bungee/ServerConnector.java#L91-L106
                 handshake.server_address = format!(
                     "{}\x00{}\x00{}",

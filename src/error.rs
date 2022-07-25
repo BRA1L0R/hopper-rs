@@ -14,6 +14,9 @@ pub enum HopperError {
     #[error("one of the two parties terminated the connection: {0}")]
     Disconnected(std::io::Error),
 
+    #[error("the user sent invalid handshake data")]
+    Invalid,
+
     #[error("configuration error: {0}")]
     Config(#[from] ConfigError),
 

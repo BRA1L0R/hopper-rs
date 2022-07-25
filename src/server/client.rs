@@ -33,7 +33,6 @@ impl IncomingClient {
             .write_serialize(Disconnect::new(reason))
             .await
             .ok();
-        drop(self.stream)
     }
 
     pub async fn disconnect_err_chain<E: Error>(self, err: E) -> E {
