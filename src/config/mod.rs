@@ -12,9 +12,10 @@ use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::sync::Mutex;
 
-use self::balancer::Balanced;
+use self::{balancer::Balanced, resolver::ResolvableAddr};
 
 mod balancer;
+mod resolver;
 
 #[derive(Deserialize)]
 /// Defines the structure of a config file. Extension can be
@@ -50,7 +51,7 @@ where
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum RouteType {
-    Simple(SocketAddr),
+    Simple(ResolvableAddr),
     #[serde(deserialize_with = "deserialize_mutex")]
     Balanced(Mutex<Balanced>),
 }
@@ -58,7 +59,7 @@ enum RouteType {
 impl RouteType {
     async fn get(&self) -> SocketAddr {
         match self {
-            RouteType::Simple(route) => *route,
+            RouteType::Simple(route) => (*route).into(),
             RouteType::Balanced(balancer) => balancer.lock().await.get(),
         }
     }

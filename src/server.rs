@@ -41,7 +41,7 @@ impl Hopper {
                     }
                     Err(err) => {
                         log::error!("Couldn't connect {client}: {err}");
-                        Err(client.disconnect_err_chain(err).await.into())
+                        Err(client.disconnect_err_chain(err.into()).await)
                     }
                 }
             };

@@ -1,10 +1,11 @@
+use serde::Deserialize;
 use std::net::SocketAddr;
 
-use serde::Deserialize;
+use super::resolver::ResolvableAddr;
 
 #[derive(Debug)]
 pub struct Balanced {
-    servers: Vec<SocketAddr>,
+    servers: Vec<ResolvableAddr>,
     last_used: usize,
 }
 
@@ -13,9 +14,8 @@ impl<'de> Deserialize<'de> for Balanced {
     where
         D: serde::Deserializer<'de>,
     {
-        let servers = Vec::deserialize(deserializer)?;
         Ok(Self {
-            servers,
+            servers: Vec::deserialize(deserializer)?,
             last_used: Default::default(),
         })
     }
@@ -26,6 +26,6 @@ impl Balanced {
         let item = self.servers[self.last_used];
         self.last_used = (self.last_used + 1) % self.servers.len();
 
-        item
+        item.into()
     }
 }
