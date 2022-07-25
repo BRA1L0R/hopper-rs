@@ -35,10 +35,10 @@ default = { ip = "127.0.0.1:12345" } # optional
 "mc.gaming.tk" = { ip = "127.0.0.1:25008" }
 
 # bungeecord's ip forwarding feature enabled
-"mc.server.com" = { ip-forwarding = "bungeecord", ip "127.0.0.1:25123" }
+"mc.server.com" = { ip-forwarding = "bungeecord", ip = "127.0.0.1:25123" }
 
 # this will load balance between the two servers
-"other.gaming.tk" = ["127.0.0.1:25009", "10.1.0.1:25123"]
+"other.gaming.tk" = { ip = ["127.0.0.1:25009", "10.1.0.1:25123"] }
 ```
 
 ### IP Forwarding
