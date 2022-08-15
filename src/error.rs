@@ -1,7 +1,7 @@
 use config::ConfigError;
 use thiserror::Error;
 
-use crate::{protocol::error::ProtoError, server::router::RouterError};
+use crate::protocol::error::ProtoError;
 
 #[derive(Error, Debug)]
 pub enum HopperError {
@@ -9,7 +9,7 @@ pub enum HopperError {
     Protocol(#[from] ProtoError),
 
     #[error("routing error: {0}")]
-    Router(#[from] RouterError),
+    Router(Box<dyn std::error::Error + Send + Sync>),
 
     #[error("one of the two parties terminated the connection: {0}")]
     Disconnected(std::io::Error),

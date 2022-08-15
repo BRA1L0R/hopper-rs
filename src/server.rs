@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 use tokio::net::TcpListener;
 
 pub mod bridge;
@@ -9,12 +9,15 @@ pub use crate::HopperError;
 pub use client::IncomingClient;
 pub use router::Router;
 
-pub struct Hopper {
-    router: Arc<dyn Router>,
+pub struct Hopper<RE: Error> {
+    router: Arc<dyn Router<Error = RE>>,
 }
 
-impl Hopper {
-    pub fn new(router: impl Router + 'static) -> Self {
+impl<RE> Hopper<RE>
+where
+    RE: Error + Send + Sync + 'static,
+{
+    pub fn new(router: impl Router<Error = RE> + 'static) -> Self {
         let router = Arc::new(router);
         Self { router }
     }
@@ -41,7 +44,10 @@ impl Hopper {
                     }
                     Err(err) => {
                         log::error!("Couldn't connect {client}: {err}");
-                        Err(client.disconnect_err_chain(err.into()).await)
+                        let err = client
+                            .disconnect_err_chain(HopperError::Router(Box::new(err)))
+                            .await;
+                        Err(err)
                     }
                 }
             };

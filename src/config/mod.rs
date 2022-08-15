@@ -2,7 +2,6 @@ use crate::{
     protocol::packets::Handshake,
     server::{
         bridge::{Bridge, ForwardStrategy},
-        router::RouterError,
         Router,
     },
 };
@@ -10,6 +9,7 @@ use async_trait::async_trait;
 use config::{ConfigError, File};
 use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, net::SocketAddr};
+use thiserror::Error;
 use tokio::sync::Mutex;
 
 use self::{balancer::Balanced, resolver::ResolvableAddr};
@@ -65,6 +65,15 @@ impl RouteType {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum ConfigRouterError {
+    #[error("no server with such hostname has been found")]
+    NoServer,
+
+    #[error("unable to connect to server: {0}")]
+    Unreachable(std::io::Error),
+}
+
 #[derive(Deserialize)]
 pub struct RouteInfo {
     #[serde(alias = "ip-forwarding", default)]
@@ -83,14 +92,18 @@ pub struct RouterConfig {
 
 #[async_trait]
 impl Router for RouterConfig {
-    async fn route(&self, handshake: &Handshake) -> Result<Bridge, RouterError> {
+    type Error = ConfigRouterError;
+
+    async fn route(&self, handshake: &Handshake) -> Result<Bridge, ConfigRouterError> {
         let destination = &handshake.server_address;
         let route = self
             .routes
             .get(destination)
             .or(self.default.as_ref())
-            .ok_or(RouterError::NoServer)?;
+            .ok_or(ConfigRouterError::NoServer)?;
 
-        Bridge::connect(route.ip.get().await, route.ip_forwarding).await
+        Bridge::connect(route.ip.get().await, route.ip_forwarding)
+            .await
+            .map_err(ConfigRouterError::Unreachable)
     }
 }

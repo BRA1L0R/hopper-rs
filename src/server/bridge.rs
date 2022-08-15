@@ -4,9 +4,9 @@ use crate::{
     HopperError,
 };
 
-use super::{client::IncomingClient, router::RouterError};
+use super::client::IncomingClient;
 use serde::Deserialize;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 use tokio::{
     io::{copy, AsyncWriteExt},
     net::{
@@ -38,10 +38,10 @@ impl Bridge {
     pub async fn connect(
         addr: SocketAddr,
         forwarding: ForwardStrategy,
-    ) -> Result<Self, RouterError> {
-        let stream = TcpStream::connect(addr)
-            .await
-            .map_err(RouterError::Unreachable)?;
+    ) -> Result<Self, std::io::Error> {
+        // timeout after 5 seconds of trying to connect to server
+        let stream =
+            tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(addr)).await??;
 
         Ok(Self { stream, forwarding })
     }
