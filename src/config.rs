@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use config::{ConfigError, File};
 use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, net::SocketAddr};
-use thiserror::Error;
 use tokio::sync::Mutex;
 
 use self::{balancer::Balanced, resolver::ResolvableAddr};
