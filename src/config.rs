@@ -2,6 +2,7 @@ use crate::{
     protocol::packets::Handshake,
     server::{
         bridge::{Bridge, ForwardStrategy},
+        router::RouterError,
         Router,
     },
 };
@@ -65,15 +66,6 @@ impl RouteType {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum ConfigRouterError {
-    #[error("no server with such hostname has been found")]
-    NoServer,
-
-    #[error("unable to connect to server: {0}")]
-    Unreachable(std::io::Error),
-}
-
 #[derive(Deserialize)]
 pub struct RouteInfo {
     #[serde(alias = "ip-forwarding", default)]
@@ -92,18 +84,18 @@ pub struct RouterConfig {
 
 #[async_trait]
 impl Router for RouterConfig {
-    type Error = ConfigRouterError;
+    // type Error = ConfigRouterError;
 
-    async fn route(&self, handshake: &Handshake) -> Result<Bridge, ConfigRouterError> {
+    async fn route(&self, handshake: &Handshake) -> Result<Bridge, RouterError> {
         let destination = &handshake.server_address;
         let route = self
             .routes
             .get(destination)
             .or(self.default.as_ref())
-            .ok_or(ConfigRouterError::NoServer)?;
+            .ok_or(RouterError::NoServer)?;
 
         Bridge::connect(route.ip.get().await, route.ip_forwarding)
             .await
-            .map_err(ConfigRouterError::Unreachable)
+            .map_err(RouterError::Unreachable)
     }
 }

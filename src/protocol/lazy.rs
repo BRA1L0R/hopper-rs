@@ -1,10 +1,9 @@
-use std::io::Cursor;
-
 use super::{
     data::{Deserialize, PacketId},
     error::ProtoError,
     Packet,
 };
+use std::io::Cursor;
 
 pub struct LazyPacket<T: PacketId> {
     packet: Packet,

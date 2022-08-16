@@ -111,4 +111,23 @@ cargo build --release
 
 - The runnable binary will now be available at `target/release/hopper`
 
+## Changing the verbosity level
+
+If you think something is off with your instance and want to enable debug logging, or you just want to reduce the default talkativeness of hopper you must choose your desired level of verbosity through the `RUST_LOG` environment variable.
+
+| Level | Description                                                                     |
+| ----- | ------------------------------------------------------------------------------- |
+| off   | No console output at all                                                        |
+| error | Only output important errors such as an unreachable backend server              |
+| info  | Informative data such as incoming connections and the current listening address |
+| debug | More descriptive errors (includes failed handshakes and bad packet data)        |
+
+_Default: `info`_
+
+Example:
+
+```sh
+RUST_LOG="debug" ./hopper
+```
+
 TODO: running information with systemd configuration example

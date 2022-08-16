@@ -1,7 +1,7 @@
 use config::ConfigError;
 use thiserror::Error;
 
-use crate::protocol::error::ProtoError;
+use crate::{metrics::MetricsError, protocol::error::ProtoError};
 
 #[derive(Error, Debug)]
 pub enum HopperError {
@@ -10,6 +10,9 @@ pub enum HopperError {
 
     #[error("routing error: {0}")]
     Router(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("metrics engine error: {0}")]
+    Metrics(#[from] MetricsError),
 
     #[error("one of the two parties terminated the connection: {0}")]
     Disconnected(std::io::Error),
