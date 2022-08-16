@@ -1,8 +1,5 @@
-use std::error::Error;
-
-use thiserror::Error;
-
 use crate::protocol::packets::Handshake;
+use std::error::Error;
 
 use super::bridge::Bridge;
 

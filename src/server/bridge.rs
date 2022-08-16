@@ -104,8 +104,6 @@ impl Bridge {
                     uuid
                 );
 
-                println!("{handshake:?} {logindata:?} {uuid}");
-
                 stream.write_serialize(handshake).await?;
                 stream.write_packet(login).await?
             }
