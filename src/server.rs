@@ -50,16 +50,17 @@ impl Hopper {
                 match router.route(handshake).await {
                     Ok(bridge) => {
                         log::info!("{client} connected to {}", bridge.address()?);
-                        metrics.join().await?;
 
+                        metrics.join().await?;
                         bridge.bridge(client).await
                     }
                     Err(err) => {
                         log::error!("Couldn't connect {client}: {err}");
-                        metrics.join_error(&err).await?;
 
-                        let err = client.disconnect_err_chain(err.into()).await;
-                        Err(err)
+                        metrics.join_error(&err).await?;
+                        client.disconnect_err(&err).await;
+
+                        Err(err.into())
                     }
                 }
             };

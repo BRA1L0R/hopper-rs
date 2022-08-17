@@ -17,7 +17,7 @@ where
         .to_socket_addrs()
         .map_err(|err| Error::custom(format!("invalid hostname format: {err}")))?;
 
-    addr.next().ok_or_else(|| Error::custom("msg"))
+    addr.next().ok_or_else(|| Error::missing_field("address"))
 }
 
 impl From<ResolvableAddr> for SocketAddr {

@@ -35,9 +35,8 @@ impl IncomingClient {
             .ok();
     }
 
-    pub async fn disconnect_err_chain<E: Error>(self, err: E) -> E {
+    pub async fn disconnect_err(self, err: impl Error) {
         self.disconnect(err.to_string()).await;
-        err
     }
 
     pub async fn handshake(
