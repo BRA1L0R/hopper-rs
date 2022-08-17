@@ -43,6 +43,8 @@ impl Bridge {
         let stream =
             tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(addr)).await??;
 
+        // let stream = TcpStream::connect(addr).await?;
+
         Ok(Self { stream, forwarding })
     }
 

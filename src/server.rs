@@ -25,6 +25,8 @@ impl Hopper {
 
         loop {
             let client = listener.accept().await.unwrap();
+
+            // TODO: clone only when needed
             let router = self.router.clone();
             let metrics = self.metrics.clone();
 
@@ -56,9 +58,7 @@ impl Hopper {
                         log::error!("Couldn't connect {client}: {err}");
                         metrics.join_error(&err).await?;
 
-                        let err = client
-                            .disconnect_err_chain(HopperError::Router(Box::new(err)))
-                            .await;
+                        let err = client.disconnect_err_chain(err.into()).await;
                         Err(err)
                     }
                 }

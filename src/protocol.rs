@@ -19,6 +19,8 @@ use self::{
     varint::{ReadVarIntExtAsync, WriteVarIntExt, WriteVarIntExtAsync},
 };
 
+const SIZE_LIMIT: usize = 2 * 1024 * 1024; // 2 megabytes
+
 #[derive(Debug)]
 pub struct Packet {
     packet_id: VarInt,
@@ -69,6 +71,10 @@ where
         let (_, VarInt(packet_len)) = self.read_varint().await?;
         let packet_len = packet_len as usize;
 
+        if packet_len > SIZE_LIMIT {
+            return Err(ProtoError::SizeLimit);
+        }
+
         let (id_size, packet_id) = self.read_varint().await?;
 
         // creates a buffer with capacity and length set to
@@ -85,11 +91,6 @@ where
             data: data.into_inner(),
         })
     }
-
-    // async fn write_packet<P: AsRef<Packet>>(&mut self, packet: P) -> Result<(), ProtoError> {
-    //     let packet = packet.as_ref();
-
-    // }
 }
 
 #[async_trait]

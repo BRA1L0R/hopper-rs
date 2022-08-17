@@ -10,6 +10,9 @@ pub enum ProtoError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    #[error("packet size exceeds size limit")]
+    SizeLimit,
+
     #[error("invalid varint size")]
     VarInt,
 

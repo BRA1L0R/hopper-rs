@@ -87,12 +87,15 @@ impl Router for RouterConfig {
 
     async fn route(&self, handshake: &Handshake) -> Result<Bridge, RouterError> {
         let destination = &handshake.server_address;
+
+        // resolve hostname from the configuration
         let route = self
             .routes
             .get(destination)
             .or(self.default.as_ref())
             .ok_or(RouterError::NoServer)?;
 
+        // connect to the resolved backend server
         Bridge::connect(route.ip.get().await, route.ip_forwarding)
             .await
             .map_err(RouterError::Unreachable)

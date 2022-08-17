@@ -1,7 +1,7 @@
 use config::ConfigError;
 use thiserror::Error;
 
-use crate::{metrics::MetricsError, protocol::error::ProtoError};
+use crate::{metrics::MetricsError, protocol::error::ProtoError, server::router::RouterError};
 
 #[derive(Error, Debug)]
 pub enum HopperError {
@@ -9,7 +9,7 @@ pub enum HopperError {
     Protocol(#[from] ProtoError),
 
     #[error("routing error: {0}")]
-    Router(Box<dyn std::error::Error + Send + Sync>),
+    Router(#[from] RouterError),
 
     #[error("metrics engine error: {0}")]
     Metrics(#[from] MetricsError),
