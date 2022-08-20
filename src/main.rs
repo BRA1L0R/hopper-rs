@@ -2,7 +2,7 @@ use std::{convert::Infallible, sync::Arc};
 
 use crate::config::ServerConfig;
 use log::LevelFilter;
-use metrics::EmptyInjector;
+use metrics::injector::EmptyInjector;
 use server::Hopper;
 use simple_logger::SimpleLogger;
 use tokio::{main, net::TcpListener};
@@ -31,7 +31,8 @@ async fn run() -> Result<Infallible, HopperError> {
         .map_err(HopperError::Bind)?;
 
     // builds a new hopper instance with a router
-    let server = Hopper::new(Arc::new(EmptyInjector), Arc::new(config.routing));
+    let server = Hopper::new(Arc::new(config.routing), Box::new(EmptyInjector));
+
     server.listen(listener).await
 }
 

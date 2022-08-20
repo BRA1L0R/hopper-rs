@@ -5,19 +5,22 @@ pub mod bridge;
 pub mod client;
 pub mod router;
 
-use crate::metrics::{api::MetricsApi, MetricsInjector};
+use crate::metrics::{injector::MetricsInjector, EventType, Metrics};
 pub use crate::HopperError;
 pub use client::IncomingClient;
 pub use router::Router;
 
 pub struct Hopper {
-    metrics: Arc<dyn MetricsInjector>,
+    metrics: Arc<Metrics>,
     router: Arc<dyn Router>,
 }
 
 impl Hopper {
-    pub fn new(metrics: Arc<dyn MetricsInjector>, router: Arc<dyn Router>) -> Self {
-        Self { router, metrics }
+    pub fn new(router: Arc<dyn Router>, injector: Box<dyn MetricsInjector>) -> Self {
+        Self {
+            router,
+            metrics: Arc::new(Metrics::init(injector)),
+        }
     }
 
     pub async fn listen(&self, listener: TcpListener) -> ! {
@@ -33,34 +36,37 @@ impl Hopper {
             let handler = async move {
                 // receives a handshake from the client and decodes its information
                 let mut client = IncomingClient::handshake(client).await?;
+                // packets are lazily evaluated, this call evaluates the handshake packet and
+                // returns an error if the data received is wrong
                 let handshake = client.handshake.data()?;
-
-                // construct a metrics guard with the parameters
-                // of the current connection
-                let metrics = MetricsApi::new(
-                    metrics,
-                    client.address,
-                    &handshake.server_address,
-                    handshake.next_state,
-                );
 
                 // routes a client by reading handshake information
                 // then if a route has been found it connects to the server
                 // but does not yet send handshaking information
                 match router.route(handshake).await {
                     Ok(bridge) => {
+                        let guard =
+                            metrics.guard(handshake.server_address.clone(), handshake.next_state);
+
+                        guard.send_event(EventType::Connect).await;
                         log::info!("{client} connected to {}", bridge.address()?);
 
-                        metrics.join().await?;
-                        bridge.bridge(client).await
+                        let (serverbound, clientbound) = bridge.bridge(client).await?;
+                        guard
+                            .send_event(EventType::Disconnect {
+                                serverbound,
+                                clientbound,
+                            })
+                            .await;
+
+                        log::debug!("Connection terminated, transferred serverbound: {serverbound} bytes clientbound: {clientbound} bytes");
+                        Ok(())
                     }
                     Err(err) => {
                         log::error!("Couldn't connect {client}: {err}");
 
-                        metrics.join_error(&err).await?;
                         client.disconnect_err(&err).await;
-
-                        Err(err.into())
+                        Err(HopperError::from(err))
                     }
                 }
             };

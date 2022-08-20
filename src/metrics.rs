@@ -1,63 +1,120 @@
+use self::injector::{MetricsError, MetricsInjector};
 use crate::protocol::packets::State;
-use async_trait::async_trait;
-use std::net::SocketAddr;
-use thiserror::Error;
+use std::{collections::HashMap, convert::Infallible, sync::Arc, time::Duration};
+use tokio::{
+    select,
+    sync::mpsc::{self, Receiver},
+    time,
+};
 
-pub mod api;
-pub mod influx;
+pub mod injector;
 
 #[derive(Debug)]
 pub enum EventType {
     Connect,
-    Disconnect,
-    ConnectionError {
-        error: String,
-    },
-    BandwidthReport {
-        server_bound: u64,
-        client_bound: u64,
-    },
+    Disconnect { serverbound: u64, clientbound: u64 },
+    // Disconnect,
 }
 
 #[derive(Debug)]
-pub struct Event<'a> {
-    from: &'a SocketAddr,
-    hostname: &'a str,
-    state: State,
-
+pub struct Event {
+    information: GuardInformation,
     event_type: EventType,
 }
 
-impl<'a> Event<'a> {
-    pub fn new(
-        from: &'a SocketAddr,
-        hostname: &'a str,
-        state: State,
-        event: EventType,
-    ) -> Event<'a> {
-        Self {
-            from,
-            hostname,
-            state,
-            event_type: event,
-        }
+#[derive(Debug, Clone)]
+struct GuardInformation {
+    hostname: Arc<str>,
+    state: State,
+}
+
+#[derive(Debug)]
+pub struct MetricsGuard {
+    information: GuardInformation,
+    sender: mpsc::Sender<Event>,
+}
+
+impl MetricsGuard {
+    pub async fn send_event(&self, event_type: EventType) {
+        self.sender
+            .send(Event {
+                information: self.information.clone(),
+                event_type,
+            })
+            .await
+            .unwrap();
     }
 }
 
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct MetricsError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>);
+#[derive(Default, Debug)]
+pub struct HostnameCounter {
+    total_pings: u64,
+    total_game: u64,
 
-#[async_trait]
-pub trait MetricsInjector: Send + Sync {
-    async fn log(&self, event: Event<'_>) -> Result<(), MetricsError>;
+    open_connections: u64,
+
+    serverbound_bandwidth: u64,
+    clientbound_bandwidth: u64,
 }
 
-pub struct EmptyInjector;
+pub type Counters = HashMap<Arc<str>, HostnameCounter>;
 
-#[async_trait]
-impl MetricsInjector for EmptyInjector {
-    async fn log(&self, _: Event<'_>) -> Result<(), MetricsError> {
-        Ok(())
+pub struct Metrics {
+    sender: mpsc::Sender<Event>,
+}
+
+impl Metrics {
+    pub fn init(injector: Box<dyn MetricsInjector>) -> Self {
+        let (sender, receiver) = mpsc::channel::<Event>(8096);
+
+        tokio::spawn(Metrics::metrics_handler(receiver, injector));
+
+        Self { sender }
+    }
+
+    pub fn guard(&self, hostname: impl Into<Arc<str>>, state: State) -> MetricsGuard {
+        MetricsGuard {
+            sender: self.sender.clone(),
+            information: GuardInformation {
+                hostname: hostname.into(),
+                state,
+            },
+        }
+    }
+
+    async fn metrics_handler(
+        mut receiver: Receiver<Event>,
+        injector: Box<dyn MetricsInjector>,
+    ) -> Result<Infallible, MetricsError> {
+        let mut counters: Counters = Default::default();
+        let mut register_interval = time::interval(Duration::from_secs(5));
+
+        loop {
+            let event = select! {
+                _ = register_interval.tick() => { injector.log(&counters).await?; continue },
+                Some(event) = receiver.recv() => event,
+            };
+
+            let counters = counters.entry(event.information.hostname).or_default();
+
+            match event.event_type {
+                EventType::Connect => {
+                    match event.information.state {
+                        State::Status => counters.total_pings += 1,
+                        State::Login => counters.total_game += 1,
+                    }
+
+                    counters.open_connections += 1
+                } // TODO: replace with safer alternative (due to wrapping)
+                EventType::Disconnect {
+                    serverbound,
+                    clientbound,
+                } => {
+                    counters.open_connections -= 1;
+                    counters.serverbound_bandwidth += serverbound;
+                    counters.clientbound_bandwidth += clientbound;
+                }
+            }
+        }
     }
 }

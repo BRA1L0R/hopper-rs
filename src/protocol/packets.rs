@@ -21,6 +21,7 @@ impl<W: Write> Serialize<W> for Chat {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 pub enum State {
     Status = 1,
     Login = 2,

@@ -13,5 +13,5 @@ pub enum RouterError {
 
 #[async_trait::async_trait]
 pub trait Router: Send + Sync {
-    async fn route(&self, client: &Handshake) -> Result<Bridge, RouterError>;
+    async fn route(&self, handshake: &Handshake) -> Result<Bridge, RouterError>;
 }

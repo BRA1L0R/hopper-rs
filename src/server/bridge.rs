@@ -40,10 +40,9 @@ impl Bridge {
         forwarding: ForwardStrategy,
     ) -> Result<Self, std::io::Error> {
         // timeout after 5 seconds of trying to connect to server
-        let stream =
-            tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(addr)).await??;
-
-        // let stream = TcpStream::connect(addr).await?;
+        let connect = TcpStream::connect(addr);
+        // TcpSocket::cn
+        let stream = tokio::time::timeout(Duration::from_secs(5), connect).await??;
 
         Ok(Self { stream, forwarding })
     }
@@ -56,9 +55,12 @@ impl Bridge {
     /// joins two piping futures, bridging the two connections
     /// at Layer 4.
     ///
+    /// Returns the number of bytes transferred between
+    /// the client and the server. Tuple is (serverbound, clientbound)
+    ///
     /// Note: hopper does not care what bytes are shared between
     /// the twos
-    pub async fn bridge(self, client: IncomingClient) -> Result<(), HopperError> {
+    pub async fn bridge(self, client: IncomingClient) -> Result<(u64, u64), HopperError> {
         let Bridge {
             mut stream,
             forwarding,
@@ -114,30 +116,33 @@ impl Bridge {
         let (rc, wc) = client.stream.into_split();
         let (rs, ws) = stream.into_split();
 
-        #[cfg(feature = "buffered")]
-        let pipe = |mut input: BufReader<OwnedReadHalf>, mut output: BufWriter<OwnedWriteHalf>| async move {
-            copy(&mut input, &mut output).await?;
-            output.shutdown().await
-        };
+        // #[cfg(feature = "buffered")]
+        // let pipe = |mut input: BufReader<OwnedReadHalf>, mut output: BufWriter<OwnedWriteHalf>| async move {
+        //     let transferred = copy(&mut input, &mut output).await?;
+        //     output.shutdown().await.map(|_| transferred)
+        // };
 
         #[cfg(not(feature = "buffered"))]
         let pipe = |mut input: OwnedReadHalf, mut output: OwnedWriteHalf| async move {
-            copy(&mut input, &mut output).await?;
-            output.shutdown().await
+            let transferred = copy(&mut input, &mut output).await?;
+            output.shutdown().await.ok();
+
+            Ok(transferred)
         };
 
         // create two futures, one that copies server->client and the other client->server
         // then join them together to make them work on the same task concurrently
-        #[cfg(feature = "buffered")]
-        tokio::try_join!(
-            pipe(BufReader::new(rc), BufWriter::new(ws)),
-            pipe(BufReader::new(rs), BufWriter::new(wc))
-        )
-        .map_err(HopperError::Disconnected)?;
+        // #[cfg(feature = "buffered")]
+        // let res = tokio::try_join!(
+        //     pipe(BufReader::new(rc), BufWriter::new(ws)),
+        //     pipe(BufReader::new(rs), BufWriter::new(wc))
+        // )
+        // .map_err(HopperError::Disconnected)?;
 
         #[cfg(not(feature = "buffered"))]
-        tokio::try_join!(pipe(rc, ws), pipe(rs, wc)).map_err(HopperError::Disconnected)?;
+        let res =
+            tokio::try_join!(pipe(rc, ws), pipe(rs, wc)).map_err(HopperError::Disconnected)?;
 
-        Ok(())
+        Ok(res)
     }
 }

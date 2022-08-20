@@ -3,34 +3,6 @@ use async_trait::async_trait;
 use influxdb::{InfluxDbWriteable, Timestamp};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-// impl Event {
-//     fn new_query(self) -> WriteQuery {
-//         let name = self.event_type.measurement();
-//         let query = now()
-//             .into_query(name)
-//             .add_tag("from", self.from.to_string())
-//             .add_tag("hostname", self.hostname);
-
-//             let query = match self.event_type {}
-
-//         match self.event_type {
-//             super::EventType::Ping => query.add_field("count", 1),
-//             super::EventType::Join { name } | super::EventType::Leave { name } => {
-//                 query.add_field("name", name)
-//             }
-//             super::EventType::BandwidthReport {
-//                 name,
-//                 server_bound,
-//                 client_bound,
-//             } => query
-//                 .add_field("name", name)
-//                 .add_field("server_bound", server_bound)
-//                 .add_field("client_bound", client_bound),
-//             super::EventType::JoinError { name, error } => todo!(),
-//         }
-//     }
-// }
-
 impl EventType {
     pub fn measurement(&self) -> &'static str {
         match self {
@@ -66,18 +38,16 @@ impl InfluxInjector {
 impl MetricsInjector for InfluxInjector {
     async fn log(
         &self,
-        super::Event {
+        super::Metric {
             from,
             hostname,
-            state,
             event_type,
-        }: super::Event<'_>,
+        }: super::Metric<'_>,
     ) -> Result<(), MetricsError> {
         let name = event_type.measurement();
         let query = now()
             .into_query(name)
             .add_field("address", from.to_string())
-            .add_field("state", state as i32)
             .add_tag("hostname", hostname);
 
         let query = match event_type {
