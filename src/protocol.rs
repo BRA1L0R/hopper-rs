@@ -82,9 +82,7 @@ where
         let mut data = Vec::with_capacity(packet_len - id_size).limit(packet_len - id_size);
 
         // reads until the buffer is full, returns if an error occurs
-        while data.has_remaining_mut() {
-            self.read_buf(&mut data).await?;
-        }
+        while self.read_buf(&mut data).await? != 0 {}
 
         Ok(Packet {
             packet_id,

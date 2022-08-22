@@ -20,6 +20,9 @@
                 }
             },
             "args": [],
+            "env": {
+                "RUST_LOG": "debug"
+            },
             "cwd": "${workspaceFolder}"
         },
         {
