@@ -25,7 +25,7 @@ async fn run() -> Result<Infallible, HopperError> {
         .unwrap();
 
     // reads configuration from Config.toml
-    let config = ServerConfig::new()?;
+    let config = ServerConfig::read()?;
     let listener = TcpListener::bind(config.listen)
         .await
         .map_err(HopperError::Bind)?;
