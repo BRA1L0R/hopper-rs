@@ -1,6 +1,6 @@
 use std::{convert::Infallible, sync::Arc};
 
-use crate::config::ServerConfig;
+use crate::config::{metrics::MetricsConfig, ServerConfig};
 use log::LevelFilter;
 use metrics::injector::EmptyInjector;
 use server::Hopper;
@@ -26,12 +26,19 @@ async fn run() -> Result<Infallible, HopperError> {
 
     // reads configuration from Config.toml
     let config = ServerConfig::read()?;
+    println!("{config:?}");
+
     let listener = TcpListener::bind(config.listen)
         .await
         .map_err(HopperError::Bind)?;
 
+    let metrics = config
+        .metrics
+        .map(MetricsConfig::injector)
+        .unwrap_or_else(|| Box::new(EmptyInjector));
+
     // builds a new hopper instance with a router
-    let server = Hopper::new(Arc::new(config.routing), Box::new(EmptyInjector));
+    let server = Hopper::new(Arc::new(config.routing), metrics);
 
     server.listen(listener).await
 }

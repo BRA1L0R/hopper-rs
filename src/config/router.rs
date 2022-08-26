@@ -42,7 +42,7 @@ impl RouteType {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RouteInfo {
     #[serde(alias = "ip-forwarding", default)]
     ip_forwarding: ForwardStrategy,
@@ -50,7 +50,7 @@ pub struct RouteInfo {
     ip: RouteType,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RouterConfig {
     default: Option<RouteInfo>,
 

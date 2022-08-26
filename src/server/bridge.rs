@@ -116,13 +116,9 @@ impl Bridge {
         let (rc, wc) = client.stream.into_split();
         let (rs, ws) = stream.into_split();
 
-        // #[cfg(feature = "buffered")]
-        // let pipe = |mut input: BufReader<OwnedReadHalf>, mut output: BufWriter<OwnedWriteHalf>| async move {
-        //     let transferred = copy(&mut input, &mut output).await?;
-        //     output.shutdown().await.map(|_| transferred)
-        // };
+        // create two futures, one that copies server->client and the other client->server
+        // then join them together to make them work on the same task concurrently
 
-        #[cfg(not(feature = "buffered"))]
         let pipe = |mut input: OwnedReadHalf, mut output: OwnedWriteHalf| async move {
             let transferred = copy(&mut input, &mut output).await?;
             output.shutdown().await.ok();
@@ -130,16 +126,6 @@ impl Bridge {
             Ok(transferred)
         };
 
-        // create two futures, one that copies server->client and the other client->server
-        // then join them together to make them work on the same task concurrently
-        // #[cfg(feature = "buffered")]
-        // let res = tokio::try_join!(
-        //     pipe(BufReader::new(rc), BufWriter::new(ws)),
-        //     pipe(BufReader::new(rs), BufWriter::new(wc))
-        // )
-        // .map_err(HopperError::Disconnected)?;
-
-        #[cfg(not(feature = "buffered"))]
         let res =
             tokio::try_join!(pipe(rc, ws), pipe(rs, wc)).map_err(HopperError::Disconnected)?;
 

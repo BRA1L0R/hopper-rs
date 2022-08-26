@@ -45,15 +45,20 @@ impl Hopper {
                 // but does not yet send handshaking information
                 match router.route(handshake).await {
                     Ok(bridge) => {
+                        log::info!("{} connected to {}", client.address, bridge.address()?);
+
                         let guard =
                             metrics.guard(handshake.server_address.clone(), handshake.next_state);
 
+                        // bridge returns the used traffic in form of bytes
+                        // transited from client to server and vice versa
                         guard.send_event(EventType::Connect).await;
-                        log::info!("{client} connected to {}", bridge.address()?);
+                        let bridge_result = bridge.bridge(client).await;
+                        guard.send_event(EventType::Disconnect).await;
 
-                        let (serverbound, clientbound) = bridge.bridge(client).await?;
+                        let (serverbound, clientbound) = bridge_result?;
                         guard
-                            .send_event(EventType::Disconnect {
+                            .send_event(EventType::BandwidthReport {
                                 serverbound,
                                 clientbound,
                             })

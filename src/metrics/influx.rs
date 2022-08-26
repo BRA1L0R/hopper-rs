@@ -1,74 +1,54 @@
-use super::{EventType, MetricsError, MetricsInjector};
+use std::ops::Deref;
+
+use super::{Counters, HostnameCounter, MetricsError, MetricsInjector};
 use async_trait::async_trait;
-use influxdb::{InfluxDbWriteable, Timestamp};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-impl EventType {
-    pub fn measurement(&self) -> &'static str {
-        match self {
-            EventType::BandwidthReport { .. } => "bandwidth",
-            EventType::Connect | EventType::ConnectionError { .. } | EventType::Disconnect => {
-                "player_activity"
-            }
-        }
-    }
-}
-
-fn now() -> Timestamp {
-    Timestamp::Milliseconds(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis(),
-    )
-}
+use futures::stream;
+use influxdb2::models::DataPoint;
 
 pub struct InfluxInjector {
-    client: influxdb::Client,
-}
-
-impl InfluxInjector {
-    pub fn new(url: impl Into<String>, database: impl Into<String>) -> Self {
-        let client = influxdb::Client::new(url, database);
-        Self { client }
-    }
+    pub bucket: String,
+    pub client: influxdb2::Client,
 }
 
 #[async_trait]
 impl MetricsInjector for InfluxInjector {
-    async fn log(
-        &self,
-        super::Metric {
-            from,
-            hostname,
-            event_type,
-        }: super::Metric<'_>,
-    ) -> Result<(), MetricsError> {
-        let name = event_type.measurement();
-        let query = now()
-            .into_query(name)
-            .add_field("address", from.to_string())
-            .add_tag("hostname", hostname);
+    async fn log(&self, counters: &Counters) -> Result<(), MetricsError> {
+        let writes: Vec<_> = counters
+            .iter()
+            .map(|(hostname, metrics)| {
+                // destructuring ensures that no field will
+                // be left out in the future
+                let HostnameCounter {
+                    total_pings,
+                    total_game,
+                    open_connections,
+                    serverbound_bandwidth,
+                    clientbound_bandwidth,
+                } = *metrics;
 
-        let query = match event_type {
-            super::EventType::Connect => query.add_tag("type", "join"),
-            super::EventType::Disconnect => query.add_tag("type", "leave"),
-            super::EventType::ConnectionError { error } => {
-                query.add_tag("type", "error").add_field("error", error)
-            }
-
-            super::EventType::BandwidthReport {
-                server_bound,
-                client_bound,
-            } => query
-                .add_field("server_bound", server_bound)
-                .add_field("client_bound", client_bound),
-        };
+                DataPoint::builder("traffic")
+                    .tag("hostname", hostname.deref())
+                    .field("total_pings", i64::try_from(total_pings).unwrap())
+                    .field("total_game", i64::try_from(total_game).unwrap())
+                    .field("open_connections", i64::try_from(open_connections).unwrap())
+                    .field(
+                        "serverbound_bandwidth",
+                        i64::try_from(serverbound_bandwidth).unwrap(),
+                    )
+                    .field(
+                        "clientbound_bandwidth",
+                        i64::try_from(clientbound_bandwidth).unwrap(),
+                    )
+                    .build()
+                    .unwrap()
+            })
+            .collect();
 
         self.client
-            .query(query)
+            .write(&self.bucket, stream::iter(writes))
             .await
-            .map_err(|err| MetricsError(Box::new(err)))
-            .map(drop)
+            .map_err(|err| MetricsError(Box::new(err)))?;
+
+        Ok(())
     }
 }

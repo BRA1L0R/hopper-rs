@@ -6,6 +6,7 @@ use crate::protocol::{
 };
 use std::{error::Error, net::SocketAddr};
 use tokio::net::TcpStream;
+use tokio_io_timeout::TimeoutStream;
 
 pub enum NextState {
     Login(LazyPacket<LoginStart>),

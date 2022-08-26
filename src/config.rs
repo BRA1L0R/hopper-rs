@@ -1,12 +1,12 @@
 use self::{metrics::MetricsConfig, router::RouterConfig};
-use config::{ConfigError, File};
+use config::{ConfigError, Environment, File, FileFormat};
 use serde::Deserialize;
 use std::net::SocketAddr;
 
-mod metrics;
-mod router;
+pub(super) mod metrics;
+pub(super) mod router;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 /// Defines the structure of a config file. Extension can be
 pub struct ServerConfig {
     /// listening address
@@ -25,7 +25,8 @@ impl ServerConfig {
     /// (more file exts can be supported through config's features)
     pub fn read() -> Result<Self, ConfigError> {
         config::Config::builder()
-            .add_source(File::with_name("Config"))
+            .add_source(File::new("Config.toml", FileFormat::Toml))
+            .add_source(Environment::default().prefix("HOPPER"))
             .build()?
             .try_deserialize()
     }

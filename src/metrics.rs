@@ -7,13 +7,14 @@ use tokio::{
     time,
 };
 
+pub mod influx;
 pub mod injector;
 
 #[derive(Debug)]
 pub enum EventType {
     Connect,
-    Disconnect { serverbound: u64, clientbound: u64 },
-    // Disconnect,
+    BandwidthReport { serverbound: u64, clientbound: u64 },
+    Disconnect, // Disconnect,
 }
 
 #[derive(Debug)]
@@ -36,6 +37,9 @@ pub struct MetricsGuard {
 
 impl MetricsGuard {
     pub async fn send_event(&self, event_type: EventType) {
+        let cap = self.sender.capacity();
+        log::debug!("Sending event, channel capacity: {cap}");
+
         self.sender
             .send(Event {
                 information: self.information.clone(),
@@ -46,7 +50,7 @@ impl MetricsGuard {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct HostnameCounter {
     total_pings: u64,
     total_game: u64,
@@ -91,11 +95,16 @@ impl Metrics {
 
         loop {
             let event = select! {
-                _ = register_interval.tick() => { injector.log(&counters).await?; continue },
+                _ = register_interval.tick() => {
+                    if let Err(err) = injector.log(&counters).await { log::error!("InfluxDB reported an error: {err}") };
+                    continue
+                },
                 Some(event) = receiver.recv() => event,
             };
 
             let counters = counters.entry(event.information.hostname).or_default();
+
+            println!("{counters:?}");
 
             match event.event_type {
                 EventType::Connect => {
@@ -106,11 +115,11 @@ impl Metrics {
 
                     counters.open_connections += 1
                 } // TODO: replace with safer alternative (due to wrapping)
-                EventType::Disconnect {
+                EventType::Disconnect => counters.open_connections -= 1,
+                EventType::BandwidthReport {
                     serverbound,
                     clientbound,
                 } => {
-                    counters.open_connections -= 1;
                     counters.serverbound_bandwidth += serverbound;
                     counters.clientbound_bandwidth += clientbound;
                 }
