@@ -23,7 +23,7 @@ byteorder = "1.4"
 thiserror = "1.0"
 hopper_macros = { path = "./macros" }
 log = "0.4"
-simple_logger = { git = "https://github.com/BRA1L0R/rust-simple_logger" } # until my pr gets merged
+simple_logger = "2.3"
 bytes = "1"
 uuid = { version = "1.1" }
 md5 = { version = "0.7" } 
