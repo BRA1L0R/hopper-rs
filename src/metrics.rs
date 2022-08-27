@@ -37,9 +37,6 @@ pub struct MetricsGuard {
 
 impl MetricsGuard {
     pub async fn send_event(&self, event_type: EventType) {
-        let cap = self.sender.capacity();
-        log::debug!("Sending event, channel capacity: {cap}");
-
         self.sender
             .send(Event {
                 information: self.information.clone(),
@@ -103,8 +100,6 @@ impl Metrics {
             };
 
             let counters = counters.entry(event.information.hostname).or_default();
-
-            println!("{counters:?}");
 
             match event.event_type {
                 EventType::Connect => {

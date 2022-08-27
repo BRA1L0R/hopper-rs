@@ -8,11 +8,12 @@ use super::client::IncomingClient;
 use serde::Deserialize;
 use std::{net::SocketAddr, time::Duration};
 use tokio::{
-    io::{copy, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
         TcpStream,
     },
+    select,
 };
 
 #[cfg(feature = "buffered")]
@@ -41,7 +42,6 @@ impl Bridge {
     ) -> Result<Self, std::io::Error> {
         // timeout after 5 seconds of trying to connect to server
         let connect = TcpStream::connect(addr);
-        // TcpSocket::cn
         let stream = tokio::time::timeout(Duration::from_secs(5), connect).await??;
 
         Ok(Self { stream, forwarding })
@@ -113,22 +113,40 @@ impl Bridge {
             }
         };
 
-        let (rc, wc) = client.stream.into_split();
-        let (rs, ws) = stream.into_split();
+        let transferred = copy_bidirectional(stream, client.stream).await;
 
-        // create two futures, one that copies server->client and the other client->server
-        // then join them together to make them work on the same task concurrently
+        Ok(transferred)
+    }
+}
 
-        let pipe = |mut input: OwnedReadHalf, mut output: OwnedWriteHalf| async move {
-            let transferred = copy(&mut input, &mut output).await?;
-            output.shutdown().await.ok();
+async fn pipe(mut input: OwnedReadHalf, mut output: OwnedWriteHalf, transferred: &mut u64) {
+    let mut buffer = [0u8; 1024];
 
-            Ok(transferred)
+    loop {
+        let size = match input.read(&mut buffer).await {
+            Ok(0) | Err(_) => break,
+            Ok(p) => p,
         };
 
-        let res =
-            tokio::try_join!(pipe(rc, ws), pipe(rs, wc)).map_err(HopperError::Disconnected)?;
+        *transferred += size as u64;
 
-        Ok(res)
+        if output.write_all(&buffer[..size]).await.is_err() {
+            break;
+        }
     }
+}
+
+async fn copy_bidirectional(server: TcpStream, client: TcpStream) -> (u64, u64) {
+    let mut serverbound = 0;
+    let mut clientbound = 0;
+
+    let (rs, ws) = server.into_split();
+    let (rc, wc) = client.into_split();
+
+    select! {
+        _ = pipe(rc, ws, &mut serverbound) => {},
+        _ = pipe(rs, wc, &mut clientbound) => {}
+    };
+
+    (serverbound, clientbound)
 }

@@ -12,8 +12,8 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 
 - [x] Load balancing
 - [x] [IP Forwarding](#ip-forwarding)
+- [x] [Logging metrics] on InfluxDB
 - [ ] Webhook callbacks for events
-- [ ] Logging metrics on InfluxDB
 - [ ] Rest api for metrics and operation
 - [ ] Plugin system for Docker and hosting provider integrations
 
@@ -24,6 +24,14 @@ Example `Config.toml`:
 ```toml
 # the address hopper will listen on
 listen = "0.0.0.0:25565"
+
+# metrics configuration
+# [metrics]
+# type = "influx"
+# ...
+#
+# follow the section below for more information about
+# gathering metrics with hopper
 
 # general routing configuration
 [routing]
@@ -55,6 +63,39 @@ You can enable ip forwarding per-server on hopper with the "ip-forwarding" direc
 ip-forwarding = "bungeecord" # available options are: bungeecord, none. Defaults to none
 ip = "<your server ip>"
 ```
+
+### Logging metrics with InfluxDB
+
+Hopper supports cheap (resoure-wise), easily configurable data gathering through the help of an external database like InfluxDB (although other databases will be supported in the future, I still recommend InfluxDB whose query language is very easy and versatile).
+
+You must first configure an InfluxDB instance and get a token with writing privilege before moving along with this section.
+
+Add and modify this section according to your setup to the `Config.toml`:
+
+```toml
+[metrics] # top-level section
+type = "influxdb"
+# hostname = "my-hostname" # OPTIONAL, defaults to system hostname
+url = "<http/https>://<influxdb-host-or-ip>:<port>/"
+organization = "<Your organization>"
+bucket = "<Your data bucket>"
+token = "<Your access token>"
+```
+
+Hopper will start logging every **5 seconds** according to this data format:
+
+**Measurement "traffic":**
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| hostname | Tag | system (or custom if specified) hostname generating this metric |
+| dest_hostname | Tag | the hostname clients connected corresponding to these metrics |
+| clientbound_bandwidth | Value (int) | the traffic this host generated server=>client |
+| serverbound_bandwidth | Value (int) | same as above, but client=>server |
+| open_connections | Value(int) | connections opened in the moment of the measurement |
+| total_game | Value(int) | people who attemped or succeded joining this server |
+| total_ping | Value(int) | people who pinged this server |
+
+As counters reset through restarts, data manipulation using the influx query language allows to aggreate rows and get persistent results.
 
 ## How to run
 

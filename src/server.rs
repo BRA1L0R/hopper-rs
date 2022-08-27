@@ -36,6 +36,7 @@ impl Hopper {
             let handler = async move {
                 // receives a handshake from the client and decodes its information
                 let mut client = IncomingClient::handshake(client).await?;
+
                 // packets are lazily evaluated, this call evaluates the handshake packet and
                 // returns an error if the data received is wrong
                 let handshake = client.handshake.data()?;
@@ -43,37 +44,41 @@ impl Hopper {
                 // routes a client by reading handshake information
                 // then if a route has been found it connects to the server
                 // but does not yet send handshaking information
-                match router.route(handshake).await {
-                    Ok(bridge) => {
-                        log::info!("{} connected to {}", client.address, bridge.address()?);
-
-                        let guard =
-                            metrics.guard(handshake.server_address.clone(), handshake.next_state);
-
-                        // bridge returns the used traffic in form of bytes
-                        // transited from client to server and vice versa
-                        guard.send_event(EventType::Connect).await;
-                        let bridge_result = bridge.bridge(client).await;
-                        guard.send_event(EventType::Disconnect).await;
-
-                        let (serverbound, clientbound) = bridge_result?;
-                        guard
-                            .send_event(EventType::BandwidthReport {
-                                serverbound,
-                                clientbound,
-                            })
-                            .await;
-
-                        log::debug!("Connection terminated, transferred serverbound: {serverbound} bytes clientbound: {clientbound} bytes");
-                        Ok(())
-                    }
+                let bridge = match router.route(handshake).await {
+                    Ok(bridge) => bridge,
                     Err(err) => {
                         log::error!("Couldn't connect {client}: {err}");
 
                         client.disconnect_err(&err).await;
-                        Err(HopperError::from(err))
+                        return Err(HopperError::from(err));
                     }
-                }
+                };
+
+                log::info!("connecting {} to {}", client.address, bridge.address()?);
+
+                // create a metricsguard which contains a channel where
+                // events are sent, and then added to the metrics state
+                let guard = metrics.guard(handshake.server_address.clone(), handshake.next_state);
+
+                // bridge returns the used traffic in form of bytes
+                // transited from client to server and vice versa
+                guard.send_event(EventType::Connect).await;
+                let bridge_result = bridge.bridge(client).await;
+                guard.send_event(EventType::Disconnect).await;
+
+                // this result is evaluated later so disconnections are
+                // always registered no matter the bridge outcome
+                let (serverbound, clientbound) = bridge_result?;
+
+                guard
+                    .send_event(EventType::BandwidthReport {
+                        serverbound,
+                        clientbound,
+                    })
+                    .await;
+
+                log::debug!("Connection terminated, transferred serverbound: {serverbound} bytes clientbound: {clientbound} bytes");
+                Ok(())
             };
 
             // creates a new task for each client

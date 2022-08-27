@@ -20,6 +20,9 @@ pub enum HopperError {
     #[error("one of the two parties terminated the connection: {0}")]
     Disconnected(std::io::Error),
 
+    #[error("one of the two parties took too long to respond")]
+    TimeOut,
+
     #[error("the user sent invalid handshake data")]
     Invalid,
 

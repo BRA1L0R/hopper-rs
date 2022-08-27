@@ -1,12 +1,14 @@
-use crate::protocol::{
-    error::ProtoError,
-    lazy::LazyPacket,
-    packets::{Disconnect, Handshake, LoginStart, State},
-    PacketReadExtAsync, PacketWriteExtAsync,
+use crate::{
+    protocol::{
+        error::ProtoError,
+        lazy::LazyPacket,
+        packets::{Disconnect, Handshake, LoginStart, State},
+        PacketReadExtAsync, PacketWriteExtAsync,
+    },
+    HopperError,
 };
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr, time::Duration};
 use tokio::net::TcpStream;
-use tokio_io_timeout::TimeoutStream;
 
 pub enum NextState {
     Login(LazyPacket<LoginStart>),
@@ -40,7 +42,7 @@ impl IncomingClient {
         self.disconnect(err.to_string()).await;
     }
 
-    pub async fn handshake(
+    async fn handshake_inner(
         (mut stream, address): (TcpStream, SocketAddr),
     ) -> Result<Self, ProtoError> {
         let mut handshake: LazyPacket<Handshake> = stream.read_packet().await?.try_into()?;
@@ -58,6 +60,13 @@ impl IncomingClient {
             handshake,
             next_state,
         })
+    }
+
+    pub async fn handshake(connection: (TcpStream, SocketAddr)) -> Result<Self, HopperError> {
+        tokio::time::timeout(Duration::from_secs(2), Self::handshake_inner(connection))
+            .await
+            .map_err(|_| HopperError::TimeOut)?
+            .map_err(HopperError::Protocol)
     }
 }
 
