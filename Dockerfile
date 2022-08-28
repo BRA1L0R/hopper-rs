@@ -20,12 +20,10 @@ RUN rm ./target/release/deps/hopper*
 RUN cargo build --release
 
 # final runnable image
-FROM alpine:latest
+FROM debian:buster-slim
 COPY --from=build /hopper/target/release/hopper .
 
-# add deps
-RUN apk add gcompat
-RUN apk add libgcc
+RUN apt-get update && apt-get install -y libssl-dev
 
 RUN chmod a+x ./hopper
 CMD ["./hopper"]

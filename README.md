@@ -12,7 +12,7 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 
 - [x] Load balancing
 - [x] [IP Forwarding](#ip-forwarding)
-- [x] [Logging metrics](#logging-metrics-with-influxdb) on InfluxDB
+- [x] [Logging metrics](#logging-metrics-with-influxdb) with InfluxDB
 - [ ] Webhook callbacks for events
 - [ ] Rest api for metrics and operation
 - [ ] Plugin system for Docker and hosting provider integrations
@@ -54,11 +54,16 @@ default = { ip = "127.0.0.1:12345" } # optional
 
 Without IP Forwarding, when servers receive connections from this reverse proxy they won't see the original client's ip address. This may lead to problems with sessions with plugins such as Authme. Hopper implements the same "protocol" BungeeCord uses (old but very compatible with all Minecraft versions).
 
-⚠️ Note: you will also need to enable the bungeecord directive in your server's configuration files. [Click here](https://shockbyte.com/billing/knowledgebase/38/IP-Forwarding-in-BungeeCord.html) to learn more.
+⚠️ Note: you will also need to enable the bungeecord option in your spigot (or derivates) server's configuration files. [Click here](https://shockbyte.com/billing/knowledgebase/38/IP-Forwarding-in-BungeeCord.html) to learn more.
 
-You can enable ip forwarding per-server on hopper with the "ip-forwarding" directive like this:
+You can enable ip forwarding **per-server** on hopper with the "ip-forwarding" directive like this:
 
 ```toml
+# You can either do it this way
+[routing.routes]
+"your.hostname.com" = { ip-forwarding = "bungeecord", ip = "<your server ip>" }
+
+# or this way
 [routing.routes."your.hostname.com"]
 ip-forwarding = "bungeecord" # available options are: bungeecord, none. Defaults to none
 ip = "<your server ip>"
@@ -66,11 +71,11 @@ ip = "<your server ip>"
 
 ### Logging metrics with InfluxDB
 
-Hopper supports cheap (resoure-wise), easily configurable data gathering through the help of an external database like InfluxDB (although other databases will be supported in the future, I still recommend InfluxDB whose query language is very easy and versatile).
+Hopper supports **cheap** (resource-wise), easily configurable data gathering through the help of an external database like InfluxDB (although other databases will be supported in the future, I still recommend InfluxDB whose query language is very easy and versatile).
 
-You must first configure an InfluxDB instance and get a token with writing privilege before moving along with this section.
+You must first configure an InfluxDB instance and get a **token** with writing privilege before moving along with this section.
 
-Add and modify this section according to your setup to the `Config.toml`:
+Add and modify this configuration section in `Config.toml` according to your setup:
 
 ```toml
 [metrics] # top-level section
@@ -95,7 +100,7 @@ Hopper will start logging every **5 seconds** according to this data format:
 | total_game | Value(int) | people who attemped or succeded joining this server |
 | total_ping | Value(int) | people who pinged this server |
 
-As counters reset through restarts, data manipulation using the influx query language allows to aggreate rows and get persistent results.
+_NOTE: As counters reset through restarts, data manipulation using the influx query language allows you to aggregate rows and get persistent results._
 
 ## How to run
 
