@@ -12,6 +12,7 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 
 - [x] Load balancing
 - [x] [IP Forwarding](#ip-forwarding)
+- [x] [RealIP] 2.4 support
 - [x] [Logging metrics](#logging-metrics-with-influxdb) with InfluxDB
 - [ ] Webhook callbacks for events
 - [ ] Rest api for metrics and operation
@@ -46,17 +47,22 @@ default = { ip = "127.0.0.1:12345" } # optional
 # bungeecord's ip forwarding feature enabled
 "mc.server.com" = { ip-forwarding = "bungeecord", ip = "127.0.0.1:25123" }
 
+# bungeecord's ip forwarding feature enabled
+"mc.withrealip.com" = { ip-forwarding = "realip", ip = "127.0.0.1:26161" }
+
 # this will load balance between the two servers
 "other.gaming.tk" = { ip = ["127.0.0.1:25009", "10.1.0.1:25123"] }
 ```
 
 ### IP Forwarding
 
-Without IP Forwarding, when servers receive connections from this reverse proxy they won't see the original client's ip address. This may lead to problems with sessions with plugins such as Authme. Hopper implements the same "protocol" BungeeCord uses (old but very compatible with all Minecraft versions).
+Without IP Forwarding, when servers receive connections from this reverse proxy they won't see the original client's ip address. This may lead to problems with sessions with plugins such as AuthMe. Hopper implements both the legacy BungeeCord protocol and the more versatile RealIP one.
 
-⚠️ Note: you will also need to enable the bungeecord option in your spigot (or derivates) server's configuration files. [Click here](https://shockbyte.com/billing/knowledgebase/38/IP-Forwarding-in-BungeeCord.html) to learn more.
+#### Bungeecord
 
-You can enable ip forwarding **per-server** on hopper with the "ip-forwarding" directive like this:
+You must enable bungeecord ip-forwarding inside of `spigot.yml` just like you would using bungeecord. [Click here](https://shockbyte.com/billing/knowledgebase/38/IP-Forwarding-in-BungeeCord.html) to learn more.
+
+You can enable ip forwarding **per-server** on hopper with the "ip-forwarding" directive:
 
 ```toml
 # You can either do it this way
@@ -67,6 +73,21 @@ You can enable ip forwarding **per-server** on hopper with the "ip-forwarding" d
 [routing.routes."your.hostname.com"]
 ip-forwarding = "bungeecord" # available options are: bungeecord, none. Defaults to none
 ip = "<your server ip>"
+```
+
+#### RealIP
+
+Hopper supports up to RealIP v2.4 (private/public key authentication has been implemented for versions after that, which only works with TCPShield).
+
+⚠️ Note: RealIP v2.4 was built using older dependencies, hence support for newer minecraft versions may be lacking.
+
+You must whitelist Hopper's ip address (or network) by adding a line inside of `plugins/TCPShield/ip-whitelist/tcpshield-ips.list`.
+
+Finally, you must enable RealIP support in your `Config.toml`:
+
+```toml
+[routing.routes]
+"your.hostname.com" = { ip-forwarding = "realip", ip = "<your server ip>" }
 ```
 
 ### Logging metrics with InfluxDB

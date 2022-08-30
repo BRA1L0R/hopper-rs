@@ -6,7 +6,7 @@ use crate::{
 
 use super::client::IncomingClient;
 use serde::Deserialize;
-use std::{net::SocketAddr, time::Duration};
+use std::{fmt::Write, net::SocketAddr, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
@@ -16,9 +16,6 @@ use tokio::{
     select,
 };
 
-#[cfg(feature = "buffered")]
-use tokio::io::{BufReader, BufWriter};
-
 #[derive(Debug, Default, Deserialize, Clone, Copy)]
 pub enum ForwardStrategy {
     #[default]
@@ -27,6 +24,10 @@ pub enum ForwardStrategy {
 
     #[serde(rename = "bungeecord")]
     BungeeCord,
+
+    // RealIP <=2.4 support
+    #[serde(rename = "realip")]
+    RealIP,
 }
 
 #[derive(Debug)]
@@ -57,35 +58,43 @@ impl Bridge {
     ///
     /// Returns the number of bytes transferred between
     /// the client and the server. Tuple is (serverbound, clientbound)
-    ///
-    /// Note: hopper does not care what bytes are shared between
-    /// the twos
-    pub async fn bridge(self, client: IncomingClient) -> Result<(u64, u64), HopperError> {
+    pub async fn bridge(self, mut client: IncomingClient) -> Result<(u64, u64), HopperError> {
         let Bridge {
-            mut stream,
+            stream: mut server,
             forwarding,
         } = self;
 
-        match (client.next_state, forwarding) {
+        match (&mut client.next_state, forwarding) {
+            // realip supports ping ip forwarding too, so catching both
+            // cases here
+            (_, ForwardStrategy::RealIP) => {
+                let mut handshake = client.handshake.into_data()?;
+
+                // if the original handshake contains these character
+                // the client is trying to hijack realip
+                if handshake.server_address.contains('/') {
+                    return Err(HopperError::Invalid);
+                }
+
+                // bungeecord and realip forwarding have a very similar structure
+                write!(handshake.server_address, "///{}", client.address).unwrap();
+
+                server.write_serialize(handshake).await?;
+            }
+
             // when next_state is status we don't have a loginstart message
             // to send along so we just send the handshake.
-            //
             // ignore any possible forwarding strategy as it does
-            // not apply to status pings
-            (NextState::Status, _) => stream.write_packet(client.handshake).await?,
-
-            // reuse the same packet data that came in-bound (without even decoding
-            // the login start packet!) ensuring max efficiency
-            (NextState::Login(login), ForwardStrategy::None) => {
-                stream.write_packet(client.handshake).await?;
-                stream.write_packet(login).await?
+            // not apply to status pings.
+            //
+            // also when the forwardstrategy is none we can just send along.
+            (NextState::Status, _) | (_, ForwardStrategy::None) => {
+                server.write_packet(client.handshake).await?;
             }
 
             // requires decoding logindata and reconstructing the handshake packet
-            (NextState::Login(mut login), ForwardStrategy::BungeeCord) => {
-                // decode handshake
+            (NextState::Login(login), ForwardStrategy::BungeeCord) => {
                 let mut handshake = client.handshake.into_data()?;
-                // decode info from LoginStart
                 let logindata = login.data()?;
 
                 // calculate the player's offline UUID. It will get
@@ -101,34 +110,44 @@ impl Bridge {
                 }
 
                 // https://github.com/SpigotMC/BungeeCord/blob/8d494242265790df1dc6d92121d1a37b726ac405/proxy/src/main/java/net/md_5/bungee/ServerConnector.java#L91-L106
-                handshake.server_address = format!(
-                    "{}\x00{}\x00{}",
+                write!(
                     handshake.server_address,
-                    client.address.ip(),
-                    uuid
-                );
+                    "\x00{}\x00{}",
+                    client.address, uuid
+                )
+                .unwrap();
 
-                stream.write_serialize(handshake).await?;
-                stream.write_packet(login).await?
+                server.write_serialize(handshake).await?;
             }
         };
 
-        let transferred = copy_bidirectional(stream, client.stream).await;
+        // if the NextState is login the login packet has been read too.
+        // Send it to the server as is.
+        if let NextState::Login(login) = client.next_state {
+            server.write_packet(login).await?;
+        }
 
+        // connect the client and the server in an infinite copy loop
+        let transferred = copy_bidirectional(server, client.stream).await;
         Ok(transferred)
     }
 }
 
+/// Uses an external transferred counter so in an event of an error or
+/// when the future gets dropped by the select data still gets recorded
 async fn pipe(mut input: OwnedReadHalf, mut output: OwnedWriteHalf, transferred: &mut u64) {
+    // A 1024 bytes buffer should be big enough
     let mut buffer = [0u8; 1024];
 
+    // read from the socket into the buffer, increment the transfer counter
+    // and then write all to the other end of the pipe
     loop {
         let size = match input.read(&mut buffer).await {
             Ok(0) | Err(_) => break,
             Ok(p) => p,
         };
 
-        *transferred += size as u64;
+        *transferred += size as u64; // always safe doing
 
         if output.write_all(&buffer[..size]).await.is_err() {
             break;
@@ -143,6 +162,9 @@ async fn copy_bidirectional(server: TcpStream, client: TcpStream) -> (u64, u64) 
     let (rs, ws) = server.into_split();
     let (rc, wc) = client.into_split();
 
+    // select ensures that when one pipe finishes
+    // the other one gets dropped. Fixes socket leak
+    // which kept sockets in a WAIT state forever
     select! {
         _ = pipe(rc, ws, &mut serverbound) => {},
         _ = pipe(rs, wc, &mut clientbound) => {}
