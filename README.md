@@ -12,7 +12,7 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 
 - [x] Load balancing
 - [x] [IP Forwarding](#ip-forwarding)
-- [x] [RealIP] 2.4 support
+- [x] [RealIP](#realip) 2.4 support
 - [x] [Logging metrics](#logging-metrics-with-influxdb) with InfluxDB
 - [ ] Webhook callbacks for events
 - [ ] Rest api for metrics and operation
