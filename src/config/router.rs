@@ -1,15 +1,12 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, ops::Deref};
 
 use serde::{Deserialize, Deserializer};
 use tokio::sync::Mutex;
 
-use crate::{
-    protocol::packets::Handshake,
-    server::{
-        bridge::{Bridge, ForwardStrategy},
-        router::RouterError,
-        Router,
-    },
+use crate::server::{
+    bridge::{Bridge, ForwardStrategy},
+    router::RouterError,
+    IncomingClient, Router,
 };
 
 use self::{balancer::Balanced, resolver::ResolvableAddr};
@@ -62,13 +59,11 @@ pub struct RouterConfig {
 impl Router for RouterConfig {
     // type Error = ConfigRouterError;
 
-    async fn route(&self, handshake: &Handshake) -> Result<Bridge, RouterError> {
-        let destination = &handshake.server_address;
-
+    async fn route(&self, client: &mut IncomingClient) -> Result<Bridge, RouterError> {
         // resolve hostname from the configuration
         let route = self
             .routes
-            .get(destination)
+            .get(client.destination.deref())
             .or(self.default.as_ref())
             .ok_or(RouterError::NoServer)?;
 

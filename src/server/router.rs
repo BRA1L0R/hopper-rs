@@ -1,5 +1,4 @@
-use super::bridge::Bridge;
-use crate::protocol::packets::Handshake;
+use super::{bridge::Bridge, IncomingClient};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,5 +12,5 @@ pub enum RouterError {
 
 #[async_trait::async_trait]
 pub trait Router: Send + Sync {
-    async fn route(&self, handshake: &Handshake) -> Result<Bridge, RouterError>;
+    async fn route(&self, client: &mut IncomingClient) -> Result<Bridge, RouterError>;
 }

@@ -29,6 +29,7 @@ impl Hopper {
         loop {
             let client = listener.accept().await.unwrap();
 
+            // cheap to clone but it'd be better to clone only if needed
             // TODO: clone only when needed
             let router = self.router.clone();
             let metrics = self.metrics.clone();
@@ -37,14 +38,10 @@ impl Hopper {
                 // receives a handshake from the client and decodes its information
                 let mut client = IncomingClient::handshake(client).await?;
 
-                // packets are lazily evaluated, this call evaluates the handshake packet and
-                // returns an error if the data received is wrong
-                let handshake = client.handshake.data()?;
-
                 // routes a client by reading handshake information
                 // then if a route has been found it connects to the server
                 // but does not yet send handshaking information
-                let bridge = match router.route(handshake).await {
+                let bridge = match router.route(&mut client).await {
                     Ok(bridge) => bridge,
                     Err(err) => {
                         log::error!("Couldn't connect {client}: {err}");
@@ -58,7 +55,10 @@ impl Hopper {
 
                 // create a metricsguard which contains a channel where
                 // events are sent, and then added to the metrics state
-                let guard = metrics.guard(handshake.server_address.clone(), handshake.next_state);
+                let guard = metrics.guard(
+                    client.destination.clone(),
+                    client.handshake.data().next_state,
+                );
 
                 // bridge returns the used traffic in form of bytes
                 // transited from client to server and vice versa
@@ -87,6 +87,11 @@ impl Hopper {
                     log::debug!("{}", err)
                 };
             });
+
+            // yield execution to the executor
+            // because accepting sockets might get
+            // into a tight loop and monopolize cpu
+            tokio::task::yield_now().await
         }
     }
 }

@@ -15,8 +15,6 @@ pub enum HopperError {
     #[error("routing error: {0}")]
     Router(#[from] RouterError),
 
-    // #[error("metrics engine error: {0}")]
-    // Metrics(#[from] MetricsError),
     #[error("one of the two parties terminated the connection: {0}")]
     Disconnected(std::io::Error),
 

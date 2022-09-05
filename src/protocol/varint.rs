@@ -46,7 +46,7 @@ macro_rules! varintread {
     ($read:expr) => {{
         let mut res = 0;
 
-        for pos in 0..4 {
+        for pos in 0..=5 {
             let current_byte = $read?;
             res |= ((current_byte.mask_data()) as i32) << (pos * 7);
 

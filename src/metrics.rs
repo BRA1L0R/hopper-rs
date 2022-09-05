@@ -1,6 +1,6 @@
 use self::injector::{MetricsError, MetricsInjector};
-use crate::protocol::packets::State;
-use std::{collections::HashMap, convert::Infallible, sync::Arc, time::Duration};
+use crate::{protocol::packets::State, server::client::Destination};
+use std::{collections::HashMap, convert::Infallible, time::Duration};
 use tokio::{
     select,
     sync::mpsc::{self, Receiver},
@@ -25,7 +25,7 @@ pub struct Event {
 
 #[derive(Debug, Clone)]
 struct GuardInformation {
-    hostname: Arc<str>,
+    hostname: Destination,
     state: State,
 }
 
@@ -58,7 +58,7 @@ pub struct HostnameCounter {
     clientbound_bandwidth: u64,
 }
 
-pub type Counters = HashMap<Arc<str>, HostnameCounter>;
+pub type Counters = HashMap<Destination, HostnameCounter>;
 
 pub struct Metrics {
     sender: mpsc::Sender<Event>,
@@ -73,13 +73,10 @@ impl Metrics {
         Self { sender }
     }
 
-    pub fn guard(&self, hostname: impl Into<Arc<str>>, state: State) -> MetricsGuard {
+    pub fn guard(&self, hostname: Destination, state: State) -> MetricsGuard {
         MetricsGuard {
             sender: self.sender.clone(),
-            information: GuardInformation {
-                hostname: hostname.into(),
-                state,
-            },
+            information: GuardInformation { hostname, state },
         }
     }
 

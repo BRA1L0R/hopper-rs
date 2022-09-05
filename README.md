@@ -14,8 +14,8 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 - [x] [IP Forwarding](#ip-forwarding)
 - [x] [RealIP](#realip) 2.4 support
 - [x] [Logging metrics](#logging-metrics-with-influxdb) with InfluxDB
+- [x] Forge support
 - [ ] Webhook callbacks for events
-- [ ] Rest api for metrics and operation
 - [ ] Plugin system for Docker and hosting provider integrations
 
 ## Configuration

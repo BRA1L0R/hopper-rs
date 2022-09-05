@@ -8,8 +8,6 @@ pub trait PacketId {
     const ID: i32;
 }
 
-// pub enum SerError {}
-
 pub trait Deserialize<R>: Sized + 'static {
     fn deserialize(reader: &mut R) -> Result<Self, ProtoError>;
 }

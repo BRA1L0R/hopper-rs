@@ -10,6 +10,9 @@ pub enum ProtoError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    #[error("received server_address did not contain a valid hostname")]
+    NoHostname,
+
     #[error("packet size exceeds size limit")]
     SizeLimit,
 

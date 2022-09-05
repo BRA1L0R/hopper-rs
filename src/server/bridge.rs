@@ -68,7 +68,7 @@ impl Bridge {
             // realip supports ping ip forwarding too, so catching both
             // cases here
             (_, ForwardStrategy::RealIP) => {
-                let mut handshake = client.handshake.into_data()?;
+                let mut handshake = client.handshake.into_data();
 
                 // if the original handshake contains these character
                 // the client is trying to hijack realip
@@ -76,8 +76,19 @@ impl Bridge {
                     return Err(HopperError::Invalid);
                 }
 
+                // FML support
+                let insert_index = handshake
+                    .server_address
+                    .find('\x00')
+                    .map(|a| a - 1)
+                    .unwrap_or(handshake.server_address.len());
+
                 // bungeecord and realip forwarding have a very similar structure
-                write!(handshake.server_address, "///{}", client.address).unwrap();
+                // write!(handshake.server_address, "///{}", client.address).unwrap();
+                let realip_data = format!("///{}", client.address);
+                handshake
+                    .server_address
+                    .insert_str(insert_index, &realip_data);
 
                 server.write_serialize(handshake).await?;
             }
@@ -94,7 +105,7 @@ impl Bridge {
 
             // requires decoding logindata and reconstructing the handshake packet
             (NextState::Login(login), ForwardStrategy::BungeeCord) => {
-                let mut handshake = client.handshake.into_data()?;
+                let mut handshake = client.handshake.into_data();
                 let logindata = login.data()?;
 
                 // calculate the player's offline UUID. It will get

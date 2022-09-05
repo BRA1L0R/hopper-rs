@@ -1,14 +1,47 @@
 use crate::{
     protocol::{
         error::ProtoError,
-        lazy::LazyPacket,
+        lazy::{DecodedPacket, LazyPacket},
         packets::{Disconnect, Handshake, LoginStart, State},
         PacketReadExtAsync, PacketWriteExtAsync,
     },
     HopperError,
 };
-use std::{error::Error, net::SocketAddr, time::Duration};
+use std::{error::Error, net::SocketAddr, ops::Deref, str::FromStr, sync::Arc, time::Duration};
 use tokio::net::TcpStream;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// verified hostname destination
+pub struct Destination(Arc<str>);
+
+pub struct NoHostname;
+
+impl Destination {
+    pub fn into_inner(self) -> Arc<str> {
+        self.0
+    }
+}
+
+impl FromStr for Destination {
+    type Err = NoHostname;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.split(|c| c == '\x00' || c == '/')
+            .next()
+            .ok_or(NoHostname)
+            .map(Into::into)
+            .map(Destination)
+    }
+}
+
+impl Deref for Destination {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
 
 pub enum NextState {
     Login(LazyPacket<LoginStart>),
@@ -19,16 +52,15 @@ pub struct IncomingClient {
     pub address: SocketAddr,
     pub stream: TcpStream,
 
-    pub handshake: LazyPacket<Handshake>,
+    pub destination: Destination,
+
+    pub handshake: DecodedPacket<Handshake>,
     pub next_state: NextState,
 }
 
 impl IncomingClient {
     pub async fn disconnect(mut self, reason: impl Into<String>) {
-        if !matches!(
-            self.handshake.data().map(|data| data.next_state),
-            Ok(State::Login)
-        ) {
+        if !matches!(self.handshake.data().next_state, State::Login) {
             return;
         }
 
@@ -45,11 +77,16 @@ impl IncomingClient {
     async fn handshake_inner(
         (mut stream, address): (TcpStream, SocketAddr),
     ) -> Result<Self, ProtoError> {
-        let mut handshake: LazyPacket<Handshake> = stream.read_packet().await?.try_into()?;
+        let handshake: DecodedPacket<Handshake> = stream.read_packet().await?.try_into()?;
+        let destination = handshake
+            .data()
+            .server_address
+            .parse()
+            .map_err(|_| ProtoError::NoHostname)?;
 
         // only read LoginStart information (containing the username)
         // if the next_state is login
-        let next_state = match handshake.data()?.next_state {
+        let next_state = match handshake.data().next_state {
             State::Status => NextState::Status,
             State::Login => NextState::Login(stream.read_packet().await?.try_into()?),
         };
@@ -57,6 +94,7 @@ impl IncomingClient {
         Ok(IncomingClient {
             address,
             stream,
+            destination,
             handshake,
             next_state,
         })
