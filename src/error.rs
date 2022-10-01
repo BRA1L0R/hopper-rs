@@ -1,7 +1,7 @@
-use config::ConfigError;
 use thiserror::Error;
 
 use crate::{
+    config::ServerConfigError,
     // metrics::MetricsError,
     protocol::error::ProtoError,
     server::router::RouterError,
@@ -25,7 +25,7 @@ pub enum HopperError {
     Invalid,
 
     #[error("configuration error: {0}")]
-    Config(#[from] ConfigError),
+    Config(#[from] ServerConfigError),
 
     #[error("cannot listen on the specified ip: {0}")]
     Bind(std::io::Error),
