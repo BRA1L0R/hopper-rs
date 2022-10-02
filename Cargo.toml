@@ -13,7 +13,7 @@ lto = true
 
 [dependencies]
 async-trait = "0.1"
-tokio = { version = "1.19", features = ["rt-multi-thread", "net", "macros", "io-util", "sync", "time"] }
+tokio = { version = "1.19", features = ["rt-multi-thread", "net", "macros", "io-util", "sync", "time", "signal"] }
 influxdb2 = { version = "0.2" }
 config = { version = "0.13", default-features = false, features = ["toml"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }

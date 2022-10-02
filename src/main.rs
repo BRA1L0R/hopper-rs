@@ -5,7 +5,7 @@ use log::LevelFilter;
 use metrics::injector::EmptyInjector;
 use server::Hopper;
 use simple_logger::SimpleLogger;
-use tokio::{main, net::TcpListener};
+use tokio::{main, net::TcpListener, select};
 
 pub use crate::error::HopperError;
 
@@ -39,7 +39,10 @@ async fn run() -> Result<Infallible, HopperError> {
     // builds a new hopper instance with a router
     let server = Hopper::new(Arc::new(config.routing), metrics);
 
-    server.listen(listener).await
+    select! {
+        _ = server.listen(listener) => unreachable!(),
+        _ = tokio::signal::ctrl_c() => Err(HopperError::Signal),
+    }
 }
 
 #[main]
