@@ -29,7 +29,7 @@ pub enum HopperError {
 
     #[error("cannot listen on the specified ip: {0}")]
     Bind(std::io::Error),
-    
+
     #[error("received sigint signal")]
     Signal,
 }

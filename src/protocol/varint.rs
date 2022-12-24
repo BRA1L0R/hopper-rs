@@ -1,7 +1,13 @@
 use async_trait::async_trait;
 use byteorder::ReadBytesExt;
-use std::io::{Read, Write};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use futures::{Future, FutureExt};
+use std::{
+    io::{ErrorKind, Read, Write},
+    mem::MaybeUninit,
+    pin::Pin,
+    task::Poll,
+};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 use super::{
     data::{Deserialize, Serialize},
@@ -46,7 +52,7 @@ macro_rules! varintread {
     ($read:expr) => {{
         let mut res = 0;
 
-        for pos in 0..=5 {
+        for pos in 0..5 {
             let current_byte = $read?;
             res |= ((current_byte.mask_data()) as i32) << (pos * 7);
 
@@ -78,13 +84,60 @@ macro_rules! varintwrite {
     }};
 }
 
-#[async_trait]
+pub struct VarIntReadFut<R: Unpin + AsyncRead> {
+    reader: R,
+
+    size: usize,
+    varint: i32,
+}
+
+impl<R: Unpin + AsyncRead> Future for VarIntReadFut<R> {
+    type Output = Result<(usize, VarInt), ProtoError>;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let mut buffer = [MaybeUninit::uninit()];
+        let mut buffer = ReadBuf::uninit(&mut buffer);
+
+        while Pin::new(&mut self.reader)
+            .poll_read(cx, &mut buffer)?
+            .is_ready()
+        {
+            // buffer is only one item long and
+            // while condition is that
+            let &[current] = buffer.filled() else {
+                return Poll::Ready(Err(ProtoError::Io(ErrorKind::UnexpectedEof.into())));
+            };
+
+            // reset the buffer
+            buffer.set_filled(0);
+
+            self.varint |= (current.mask_data() as i32) << (self.size * 7);
+            self.size += 1;
+
+            if current.has_stop() {
+                return Poll::Ready(Ok((self.size, self.varint.into())));
+            } else if self.size >= 5 {
+                return Poll::Ready(Err(ProtoError::VarInt));
+            }
+        }
+
+        Poll::Pending
+    }
+}
+
 pub trait ReadVarIntExtAsync
 where
-    Self: Unpin + AsyncRead,
+    Self: Unpin + AsyncRead + Sized,
 {
-    async fn read_varint(&mut self) -> Result<(usize, VarInt), ProtoError> {
-        varintread!(self.read_u8().await)
+    fn read_varint(&mut self) -> VarIntReadFut<&mut Self> {
+        VarIntReadFut {
+            reader: self,
+            size: 0,
+            varint: 0,
+        }
     }
 }
 
@@ -163,25 +216,29 @@ impl From<i32> for VarInt {
 mod test {
     use std::io::Cursor;
 
+    use crate::protocol::varint::ReadVarIntExtAsync;
+
     use super::VarInt;
     use super::WriteVarIntExt;
 
-    macro_rules! test_varint {
-        ($val:expr, $res:expr) => {
-            let mut buf = Cursor::new([0; 5]);
-            let written = buf.write_varint(VarInt($val)).unwrap();
-            assert_eq!(&buf.get_ref()[..written], $res);
-            assert_eq!(buf.position(), written as u64)
-            // assert_eq!(written, $written);
-        };
+    fn test_varint(val: i32, mut expected: &[u8]) {
+        let mut buf = Cursor::new([0; 5]);
+        let written = buf.write_varint(VarInt(val)).unwrap();
+        assert_eq!(&buf.get_ref()[..written], expected);
+        assert_eq!(buf.position(), written as u64);
+
+        let mut expected_reader = Cursor::new(expected);
+        let (size, res) = futures::executor::block_on(expected_reader.read_varint()).unwrap();
+        assert_eq!(res, val);
+        assert_eq!(size, expected.len());
     }
 
     #[test]
     fn varint_write() {
-        test_varint!(0, &[0]);
-        test_varint!(2, &[2]);
-        test_varint!(255, &[0xFF, 0x01]);
-        test_varint!(25565, &[0xDD, 0xC7, 0x01]);
-        test_varint!(-1, &[0xFF, 0xFF, 0xFF, 0xFF, 0x0F]);
+        test_varint(0, &[0]);
+        test_varint(2, &[2]);
+        test_varint(255, &[0xFF, 0x01]);
+        test_varint(25565, &[0xDD, 0xC7, 0x01]);
+        test_varint(-1, &[0xFF, 0xFF, 0xFF, 0xFF, 0x0F]);
     }
 }
