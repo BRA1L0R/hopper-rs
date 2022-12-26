@@ -1,17 +1,15 @@
-use byteorder::ReadBytesExt;
-use futures::Future;
-use std::{
-    io::{ErrorKind, Read, Write},
-    mem::MaybeUninit,
-    pin::Pin,
-    task::Poll,
-};
-use tokio::io::{AsyncRead, ReadBuf};
+mod read;
+mod write;
+
+use std::io::{Read, Write};
 
 use super::{
     data::{Deserialize, Serialize},
     error::ProtoError,
 };
+
+pub use read::{ReadVarIntExt, ReadVarIntExtAsync};
+pub use write::WriteVarIntExt;
 
 pub trait VarIntOp {
     fn has_stop(self) -> bool;
@@ -46,128 +44,6 @@ impl PartialEq<i32> for VarInt {
         self.0 == *other
     }
 }
-
-macro_rules! varintread {
-    ($read:expr) => {{
-        let mut res = 0;
-
-        for pos in 0..5 {
-            let current_byte = $read?;
-            res |= ((current_byte.mask_data()) as i32) << (pos * 7);
-
-            if current_byte.has_stop() {
-                return Ok((pos + 1, VarInt(res)));
-            }
-        }
-
-        Err(ProtoError::VarInt)
-    }};
-}
-
-macro_rules! varintwrite {
-    ($buf:ident, $val:ident) => {{
-        let mut written = 0;
-        std::iter::successors(Some($val), |val| Some(val >> 7))
-            .take_while(|val| *val != 0)
-            .map(|val| (val as u8).add_continue())
-            .enumerate()
-            .for_each(|(pos, val)| {
-                written = pos;
-                $buf[pos] = val
-            });
-
-        // remove continue bit from the last element
-        $buf[written] &= 0x7F;
-
-        (&mut $buf[..=written], written + 1)
-    }};
-}
-
-pub struct VarIntReadFut<R: Unpin + AsyncRead> {
-    reader: R,
-
-    size: usize,
-    varint: i32,
-}
-
-impl<R: Unpin + AsyncRead> Future for VarIntReadFut<R> {
-    type Output = Result<(usize, VarInt), ProtoError>;
-
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Self::Output> {
-        let mut buffer = [MaybeUninit::uninit()];
-        let mut buffer = ReadBuf::uninit(&mut buffer);
-
-        while Pin::new(&mut self.reader)
-            .poll_read(cx, &mut buffer)?
-            .is_ready()
-        {
-            // buffer is only one item long and
-            // and buffer gets reset at each loop
-            let &[current] = buffer.filled() else {
-                return Poll::Ready(Err(ProtoError::Io(ErrorKind::UnexpectedEof.into())));
-            };
-
-            // reset the buffer
-            buffer.set_filled(0);
-
-            self.varint |= (current.mask_data() as i32) << (self.size * 7);
-            self.size += 1;
-
-            // check if byte has stop condition bit or else if
-            // it's exceeding its limit return err
-            if current.has_stop() {
-                return Poll::Ready(Ok((self.size, self.varint.into())));
-            } else if self.size >= 5 {
-                return Poll::Ready(Err(ProtoError::VarInt));
-            }
-        }
-
-        Poll::Pending
-    }
-}
-
-pub trait ReadVarIntExtAsync
-where
-    Self: Unpin + AsyncRead + Sized,
-{
-    fn read_varint(&mut self) -> VarIntReadFut<&mut Self> {
-        VarIntReadFut {
-            reader: self,
-            size: 0,
-            varint: 0,
-        }
-    }
-}
-
-pub trait ReadVarIntExt
-where
-    Self: Read,
-{
-    fn read_varint(&mut self) -> Result<(usize, VarInt), ProtoError> {
-        varintread!(self.read_u8())
-    }
-}
-
-pub trait WriteVarIntExt
-where
-    Self: Write,
-{
-    fn write_varint(&mut self, VarInt(val): VarInt) -> Result<usize, ProtoError> {
-        let val = val as u32;
-        let mut buf = [0u8; 5];
-
-        let (buf, written) = varintwrite!(buf, val);
-
-        self.write_all(buf).map(|_| written).map_err(Into::into)
-    }
-}
-
-impl<T: AsyncRead + Unpin> ReadVarIntExtAsync for T {}
-impl<T: Read> ReadVarIntExt for T {}
-impl<T: Write> WriteVarIntExt for T {}
 
 impl<R: Read> Deserialize<R> for VarInt {
     fn deserialize(reader: &mut R) -> Result<Self, ProtoError> {
