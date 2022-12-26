@@ -1,13 +1,12 @@
-use async_trait::async_trait;
 use byteorder::ReadBytesExt;
-use futures::{Future, FutureExt};
+use futures::Future;
 use std::{
     io::{ErrorKind, Read, Write},
     mem::MaybeUninit,
     pin::Pin,
     task::Poll,
 };
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
+use tokio::io::{AsyncRead, ReadBuf};
 
 use super::{
     data::{Deserialize, Serialize},
@@ -97,7 +96,7 @@ impl<R: Unpin + AsyncRead> Future for VarIntReadFut<R> {
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
+    ) -> Poll<Self::Output> {
         let mut buffer = [MaybeUninit::uninit()];
         let mut buffer = ReadBuf::uninit(&mut buffer);
 
@@ -106,7 +105,7 @@ impl<R: Unpin + AsyncRead> Future for VarIntReadFut<R> {
             .is_ready()
         {
             // buffer is only one item long and
-            // while condition is that
+            // and buffer gets reset at each loop
             let &[current] = buffer.filled() else {
                 return Poll::Ready(Err(ProtoError::Io(ErrorKind::UnexpectedEof.into())));
             };
@@ -117,6 +116,8 @@ impl<R: Unpin + AsyncRead> Future for VarIntReadFut<R> {
             self.varint |= (current.mask_data() as i32) << (self.size * 7);
             self.size += 1;
 
+            // check if byte has stop condition bit or else if
+            // it's exceeding its limit return err
             if current.has_stop() {
                 return Poll::Ready(Ok((self.size, self.varint.into())));
             } else if self.size >= 5 {
@@ -150,25 +151,6 @@ where
     }
 }
 
-#[async_trait]
-pub trait WriteVarIntExtAsync
-where
-    Self: Unpin + AsyncWrite,
-{
-    // todo: rewrite in rust
-    async fn write_varint(&mut self, VarInt(val): VarInt) -> Result<usize, ProtoError> {
-        let val = val as u32;
-        let mut buf = [0u8; 5];
-
-        let (buf, written) = varintwrite!(buf, val);
-
-        self.write_all(buf)
-            .await
-            .map(|_| written)
-            .map_err(Into::into)
-    }
-}
-
 pub trait WriteVarIntExt
 where
     Self: Write,
@@ -185,7 +167,6 @@ where
 
 impl<T: AsyncRead + Unpin> ReadVarIntExtAsync for T {}
 impl<T: Read> ReadVarIntExt for T {}
-impl<T: AsyncWrite + Unpin> WriteVarIntExtAsync for T {}
 impl<T: Write> WriteVarIntExt for T {}
 
 impl<R: Read> Deserialize<R> for VarInt {
@@ -221,7 +202,7 @@ mod test {
     use super::VarInt;
     use super::WriteVarIntExt;
 
-    fn test_varint(val: i32, mut expected: &[u8]) {
+    fn test_varint(val: i32, expected: &[u8]) {
         let mut buf = Cursor::new([0; 5]);
         let written = buf.write_varint(VarInt(val)).unwrap();
         assert_eq!(&buf.get_ref()[..written], expected);

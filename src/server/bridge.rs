@@ -1,5 +1,8 @@
 use crate::{
-    protocol::{uuid::PlayerUuid, PacketWriteExtAsync},
+    protocol::{
+        packet::{self},
+        uuid::PlayerUuid,
+    },
     server::client::NextState,
     HopperError,
 };
@@ -90,7 +93,8 @@ impl Bridge {
                     .server_address
                     .insert_str(insert_index, &realip_data);
 
-                server.write_serialize(handshake).await?;
+                // server.write_serialize(handshake).await?;
+                packet::write_serialize(handshake, &mut server).await?;
             }
 
             // when next_state is status we don't have a loginstart message
@@ -100,7 +104,7 @@ impl Bridge {
             //
             // also when the forwardstrategy is none we can just send along.
             (NextState::Status, _) | (_, ForwardStrategy::None) => {
-                server.write_packet(client.handshake).await?;
+                client.handshake.as_ref().write_into(&mut server).await?;
             }
 
             // requires decoding logindata and reconstructing the handshake packet
@@ -124,18 +128,19 @@ impl Bridge {
                 write!(
                     handshake.server_address,
                     "\x00{}\x00{}",
-                    client.address, uuid
+                    client.address.ip(),
+                    uuid
                 )
                 .unwrap();
 
-                server.write_serialize(handshake).await?;
+                packet::write_serialize(handshake, &mut server).await?;
             }
         };
 
         // if the NextState is login the login packet has been read too.
         // Send it to the server as is.
         if let NextState::Login(login) = client.next_state {
-            server.write_packet(login).await?;
+            login.as_ref().write_into(&mut server).await?;
         }
 
         // connect the client and the server in an infinite copy loop

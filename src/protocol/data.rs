@@ -18,9 +18,11 @@ impl<R: Read> Deserialize<R> for String {
         let size = size as usize;
 
         let mut buf = Vec::with_capacity(size);
+        
+        // Safety: buf is read next line
         unsafe { buf.set_len(size) };
-
         reader.read_exact(&mut buf)?;
+
         String::from_utf8(buf).map_err(Into::into)
     }
 }

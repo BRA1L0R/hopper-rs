@@ -2,8 +2,8 @@ use crate::{
     protocol::{
         error::ProtoError,
         lazy::{DecodedPacket, LazyPacket},
+        packet::{self, Packet},
         packets::{Disconnect, Handshake, LoginStart, State},
-        PacketReadExtAsync, PacketWriteExtAsync,
     },
     HopperError,
 };
@@ -64,8 +64,7 @@ impl IncomingClient {
             return;
         }
 
-        self.stream
-            .write_serialize(Disconnect::new(reason))
+        packet::write_serialize(Disconnect::new(reason), &mut self.stream)
             .await
             .ok();
     }
@@ -77,7 +76,8 @@ impl IncomingClient {
     async fn handshake_inner(
         (mut stream, address): (TcpStream, SocketAddr),
     ) -> Result<Self, ProtoError> {
-        let handshake: DecodedPacket<Handshake> = stream.read_packet().await?.try_into()?;
+        let handshake: DecodedPacket<Handshake> =
+            Packet::read_from(&mut stream).await?.try_into()?;
         let destination = handshake
             .data()
             .server_address
@@ -88,7 +88,7 @@ impl IncomingClient {
         // if the next_state is login
         let next_state = match handshake.data().next_state {
             State::Status => NextState::Status,
-            State::Login => NextState::Login(stream.read_packet().await?.try_into()?),
+            State::Login => NextState::Login(Packet::read_from(&mut stream).await?.try_into()?),
         };
 
         Ok(IncomingClient {
