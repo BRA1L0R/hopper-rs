@@ -21,7 +21,7 @@ where
             .map(|val| (val as u8).add_continue())
             .enumerate()
             .for_each(|(pos, val)| {
-                written = pos + 1;
+                written = pos;
                 buf[pos] = val
             });
         // remove continue bit from the last element
@@ -29,7 +29,7 @@ where
 
         self.write_all(&buf[..=written])?;
 
-        Ok(written)
+        Ok(written + 1)
     }
 }
 

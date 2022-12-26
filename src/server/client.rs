@@ -75,14 +75,14 @@ impl IncomingClient {
 
     async fn handshake_inner(
         (mut stream, address): (TcpStream, SocketAddr),
-    ) -> Result<Self, ProtoError> {
+    ) -> Result<Self, HopperError> {
         let handshake: DecodedPacket<Handshake> =
             Packet::read_from(&mut stream).await?.try_into()?;
         let destination = handshake
             .data()
             .server_address
             .parse()
-            .map_err(|_| ProtoError::NoHostname)?;
+            .map_err(|_| HopperError::Invalid)?;
 
         // only read LoginStart information (containing the username)
         // if the next_state is login
@@ -104,7 +104,6 @@ impl IncomingClient {
         tokio::time::timeout(Duration::from_secs(2), Self::handshake_inner(connection))
             .await
             .map_err(|_| HopperError::TimeOut)?
-            .map_err(HopperError::Protocol)
     }
 }
 
