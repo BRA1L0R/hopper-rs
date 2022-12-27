@@ -1,6 +1,5 @@
 use crate::{
     protocol::{
-        error::ProtoError,
         lazy::{DecodedPacket, LazyPacket},
         packet::{self, Packet},
         packets::{Disconnect, Handshake, LoginStart, State},

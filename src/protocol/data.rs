@@ -14,11 +14,17 @@ pub trait Deserialize<R>: Sized + 'static {
 
 impl<R: Read> Deserialize<R> for String {
     fn deserialize(reader: &mut R) -> Result<String, ProtoError> {
+        const MAX_CHARS: usize = 32767;
+        const MAX_BYTES: usize = 32767 * 4;
+
         let VarInt(size) = VarInt::deserialize(reader)?;
         let size = size as usize;
 
-        let mut buf = Vec::with_capacity(size);
+        if size > MAX_BYTES {
+            return Err(ProtoError::SizeLimit);
+        }
 
+        let mut buf = Vec::with_capacity(size);
         // Safety: buf is read next line
         unsafe { buf.set_len(size) };
         reader.read_exact(&mut buf)?;
