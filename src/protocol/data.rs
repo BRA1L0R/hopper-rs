@@ -15,7 +15,7 @@ pub trait Deserialize<R>: Sized + 'static {
 impl<R: Read> Deserialize<R> for String {
     fn deserialize(reader: &mut R) -> Result<String, ProtoError> {
         const MAX_CHARS: usize = 32767;
-        const MAX_BYTES: usize = 32767 * 4;
+        const MAX_BYTES: usize = MAX_CHARS * 4;
 
         let VarInt(size) = VarInt::deserialize(reader)?;
         let size = size as usize;
