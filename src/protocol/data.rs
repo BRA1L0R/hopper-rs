@@ -20,7 +20,8 @@ impl<R: Read> Deserialize<R> for String {
         let VarInt(size) = VarInt::deserialize(reader)?;
         let size = size as usize;
 
-        if (1..MAX_BYTES).contains(&size) {
+        // if exceeds bounds return with error
+        if !(0..MAX_BYTES).contains(&size) {
             return Err(ProtoError::Size);
         }
 
