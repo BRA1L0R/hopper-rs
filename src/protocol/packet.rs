@@ -49,8 +49,8 @@ impl Packet {
         let (_, VarInt(packet_len)) = reader.read_varint().await?;
         let packet_len = packet_len as usize;
 
-        if packet_len > SIZE_LIMIT {
-            return Err(ProtoError::SizeLimit);
+        if (1..SIZE_LIMIT).contains(&packet_len) {
+            return Err(ProtoError::Size);
         }
 
         let (id_size, packet_id) = reader.read_varint().await?;

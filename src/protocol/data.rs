@@ -20,8 +20,8 @@ impl<R: Read> Deserialize<R> for String {
         let VarInt(size) = VarInt::deserialize(reader)?;
         let size = size as usize;
 
-        if size > MAX_BYTES {
-            return Err(ProtoError::SizeLimit);
+        if (1..MAX_BYTES).contains(&size) {
+            return Err(ProtoError::Size);
         }
 
         let mut buf = Vec::with_capacity(size);
