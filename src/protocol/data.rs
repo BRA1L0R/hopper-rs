@@ -1,4 +1,7 @@
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    mem::size_of,
+};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
@@ -40,27 +43,43 @@ impl<R: Read> Deserialize<R> for u16 {
     }
 }
 
-pub trait Serialize<W>: Sized + Send {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError>;
+pub trait Serialize: Sized + Send {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError>;
+
+    fn min_size(&self) -> usize {
+        0
+    }
 }
 
-impl<W: Write> Serialize<W> for &str {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+impl Serialize for &str {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
         let len = VarInt(self.len().try_into().unwrap());
 
         writer.write_varint(len)?;
         writer.write_all(self.as_bytes()).map_err(Into::into)
     }
-}
 
-impl<W: Write> Serialize<W> for String {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
-        self.as_str().serialize(writer)
+    fn min_size(&self) -> usize {
+        self.as_bytes().len() + 3
     }
 }
 
-impl<W: Write> Serialize<W> for u16 {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+impl Serialize for String {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
+        self.as_str().serialize(writer)
+    }
+
+    fn min_size(&self) -> usize {
+        self.as_str().min_size()
+    }
+}
+
+impl Serialize for u16 {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
         writer.write_u16::<BigEndian>(*self).map_err(Into::into)
+    }
+
+    fn min_size(&self) -> usize {
+        size_of::<u16>()
     }
 }

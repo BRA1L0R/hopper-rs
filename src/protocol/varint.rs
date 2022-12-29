@@ -51,9 +51,16 @@ impl<R: Read> Deserialize<R> for VarInt {
     }
 }
 
-impl<W: Write> Serialize<W> for VarInt {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+impl Serialize for VarInt {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
         writer.write_varint(*self).map(drop)
+    }
+
+    fn min_size(&self) -> usize {
+        match self.0 {
+            0..=127 => 1,
+            _ => 5,
+        }
     }
 }
 

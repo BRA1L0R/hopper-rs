@@ -6,22 +6,37 @@ use crate::{
     },
     HopperError,
 };
-use std::{error::Error, net::SocketAddr, ops::Deref, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    collections::hash_map::DefaultHasher,
+    error::Error,
+    hash::{Hash, Hasher},
+    net::SocketAddr,
+    ops::Deref,
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::net::TcpStream;
+
+// #[derive(Error, Debug)]
+// pub enum ClientError {
+//     #[error("player sent invalid handshake data")]
+//     Invalid,
+// }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 /// verified hostname destination
-pub struct Destination(Arc<str>);
+pub struct Hostname(Arc<str>);
 
 pub struct NoHostname;
 
-impl Destination {
+impl Hostname {
     pub fn into_inner(self) -> Arc<str> {
         self.0
     }
 }
 
-impl FromStr for Destination {
+impl FromStr for Hostname {
     type Err = NoHostname;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -29,11 +44,11 @@ impl FromStr for Destination {
             .next()
             .ok_or(NoHostname)
             .map(Into::into)
-            .map(Destination)
+            .map(Hostname)
     }
 }
 
-impl Deref for Destination {
+impl Deref for Hostname {
     type Target = str;
 
     #[inline]
@@ -48,12 +63,15 @@ pub enum NextState {
 }
 
 pub struct IncomingClient {
+    /// user source address
     pub address: SocketAddr,
     pub stream: TcpStream,
 
-    pub destination: Destination,
-
     pub handshake: DecodedPacket<Handshake>,
+
+    /// Sanitized hostname, differs from handshake.server_address as that
+    /// may still contain extra information.
+    pub hostname: Hostname,
     pub next_state: NextState,
 }
 
@@ -77,7 +95,9 @@ impl IncomingClient {
     ) -> Result<Self, HopperError> {
         let handshake: DecodedPacket<Handshake> =
             Packet::read_from(&mut stream).await?.try_into()?;
-        let destination = handshake
+
+        // sanitize and parse handshake server_address
+        let hostname = handshake
             .data()
             .server_address
             .parse()
@@ -93,7 +113,7 @@ impl IncomingClient {
         Ok(IncomingClient {
             address,
             stream,
-            destination,
+            hostname,
             handshake,
             next_state,
         })
@@ -103,6 +123,16 @@ impl IncomingClient {
         tokio::time::timeout(Duration::from_secs(2), Self::handshake_inner(connection))
             .await
             .map_err(|_| HopperError::TimeOut)?
+    }
+
+    /// get a non-cryptographical hash that can be used
+    /// in a load balancing operation
+    pub fn hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.address.hash(&mut hasher);
+        self.hostname.hash(&mut hasher);
+
+        hasher.finish()
     }
 }
 

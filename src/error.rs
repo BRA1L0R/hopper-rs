@@ -18,6 +18,10 @@ pub enum HopperError {
     #[error("one of the two parties terminated the connection: {0}")]
     Disconnected(std::io::Error),
 
+    #[error("unable to connect to backend server: {0}")]
+    Connect(std::io::Error),
+
+    // Server(#[from] server::)
     #[error("one of the two parties took too long to respond")]
     TimeOut,
 

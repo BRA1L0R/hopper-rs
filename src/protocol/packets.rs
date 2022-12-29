@@ -11,8 +11,8 @@ use super::{
 
 pub struct Chat(String);
 
-impl<W: Write> Serialize<W> for Chat {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+impl Serialize for Chat {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
         let chat = json!({ "text": self.0 });
         let chat = serde_json::to_string(&chat).unwrap();
 
@@ -27,9 +27,13 @@ pub enum State {
     Login = 2,
 }
 
-impl<W: Write> Serialize<W> for State {
-    fn serialize(&self, writer: &mut W) -> Result<(), ProtoError> {
+impl Serialize for State {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
         VarInt(*self as i32).serialize(writer)
+    }
+
+    fn min_size(&self) -> usize {
+        1
     }
 }
 

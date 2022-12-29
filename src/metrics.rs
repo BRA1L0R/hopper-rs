@@ -1,5 +1,5 @@
 use self::injector::{MetricsError, MetricsInjector};
-use crate::{protocol::packets::State, server::client::Destination};
+use crate::{protocol::packets::State, server::client::Hostname};
 use std::{collections::HashMap, convert::Infallible, time::Duration};
 use tokio::{
     select,
@@ -25,7 +25,7 @@ pub struct Event {
 
 #[derive(Debug, Clone)]
 struct GuardInformation {
-    hostname: Destination,
+    hostname: Hostname,
     state: State,
 }
 
@@ -58,7 +58,7 @@ pub struct HostnameCounter {
     clientbound_bandwidth: u64,
 }
 
-pub type Counters = HashMap<Destination, HostnameCounter>;
+pub type Counters = HashMap<Hostname, HostnameCounter>;
 
 pub struct Metrics {
     sender: mpsc::Sender<Event>,
@@ -73,7 +73,7 @@ impl Metrics {
         Self { sender }
     }
 
-    pub fn guard(&self, hostname: Destination, state: State) -> MetricsGuard {
+    pub fn guard(&self, hostname: Hostname, state: State) -> MetricsGuard {
         MetricsGuard {
             sender: self.sender.clone(),
             information: GuardInformation { hostname, state },

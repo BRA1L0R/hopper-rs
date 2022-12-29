@@ -25,7 +25,7 @@ impl Packet {
 
     pub fn serialize<T>(packet: &T) -> Result<Self, ProtoError>
     where
-        T: Serialize<Vec<u8>> + PacketId,
+        T: Serialize + PacketId,
     {
         let mut data = Vec::new();
         packet.serialize(&mut data)?;
@@ -99,11 +99,13 @@ impl Packet {
 // efficient in-place serialization
 pub async fn write_serialize<T, W>(data: T, writer: &mut W) -> Result<usize, ProtoError>
 where
-    T: Serialize<Vec<u8>> + PacketId,
+    T: Serialize + PacketId,
     W: AsyncWrite + Unpin,
 {
-    let mut buf = Vec::new();
-    VarInt::from(T::ID).serialize(&mut buf).unwrap();
+    let packet_id = VarInt::from(T::ID);
+    let mut buf = Vec::with_capacity(packet_id.min_size() + data.min_size());
+
+    packet_id.serialize(&mut buf).unwrap();
     data.serialize(&mut buf).unwrap();
 
     let packet_len = VarInt(buf.len() as i32);
