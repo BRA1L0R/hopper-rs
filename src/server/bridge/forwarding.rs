@@ -1,7 +1,4 @@
-use std::{
-    fmt::Write,
-    net::{SocketAddr, SocketAddrV4},
-};
+use std::{fmt::Write, net::SocketAddr};
 
 use proxy_protocol::{
     version2::{ProxyAddresses, ProxyCommand, ProxyTransportProtocol},
@@ -12,7 +9,6 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::{
     protocol::{lazy::DecodedPacket, packet, packets::Handshake, uuid::PlayerUuid},
-    server::client,
     HopperError,
 };
 

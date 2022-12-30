@@ -8,7 +8,7 @@ use super::{
     backend::{Backend, Connected},
     client::{IncomingClient, NextState},
 };
-use proxy_protocol::version2::ProxyTransportProtocol;
+
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
