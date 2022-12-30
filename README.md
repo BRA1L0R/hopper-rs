@@ -12,6 +12,7 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 
 - [x] Load balancing
 - [x] [IP Forwarding](#ip-forwarding)
+- [x] [HAProxy v2 (PROXY protocol)](#proxy-protocol-aka-haproxy-v2)
 - [x] [RealIP](#realip) 2.4 support
 - [x] [Logging metrics](#logging-metrics-with-influxdb) with InfluxDB
 - [x] Forge support
@@ -47,7 +48,7 @@ default = { ip = "127.0.0.1:12345" } # optional
 # bungeecord's ip forwarding feature enabled
 "mc.server.com" = { ip-forwarding = "bungeecord", ip = "127.0.0.1:25123" }
 
-# bungeecord's ip forwarding feature enabled
+# RealIP ip forwarding feature enabled
 "mc.withrealip.com" = { ip-forwarding = "realip", ip = "127.0.0.1:26161" }
 
 # this will load balance between the two servers
@@ -88,6 +89,18 @@ Finally, you must enable RealIP support in your `Config.toml`:
 ```toml
 [routing.routes]
 "your.hostname.com" = { ip-forwarding = "realip", ip = "<your server ip>" }
+```
+
+#### PROXY Protocol a.k.a HAProxy V2
+
+Support for [PROXY Protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt) is available by setting `ip-forwarding` to `proxy_protocol`. Only the 2nd version of
+the protocol (the one supported by Bungeecord out of the box) is implemented in Hopper.
+
+Example configuration:
+
+```toml
+[routing.routes]
+"my.bungee.hostname.com" = { ip-forwarding = "proxy_protocol", ip = "<your server ip>" }
 ```
 
 ### Logging metrics with InfluxDB

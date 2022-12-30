@@ -2,12 +2,13 @@ pub mod forwarding;
 
 use crate::HopperError;
 
-use self::forwarding::{BungeeCord, ForwardStrategy, Passthrough, RealIP};
+use self::forwarding::{BungeeCord, ForwardStrategy, Passthrough, ProxyProtocol, RealIP};
 
 use super::{
     backend::{Backend, Connected},
     client::{IncomingClient, NextState},
 };
+use proxy_protocol::version2::ProxyTransportProtocol;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
@@ -62,6 +63,18 @@ impl Bridge {
             // realip works both for login and ping
             (_, ForwardStrategy::RealIP) => {
                 let primer = RealIP::new(self.client.address);
+                self.server.prime(primer, self.client.handshake).await?
+            }
+
+            (_, ForwardStrategy::ProxyProtocol) => {
+                let self_addr = self
+                    .client
+                    .stream
+                    .local_addr()
+                    .map_err(HopperError::Disconnected)?;
+                let primer = ProxyProtocol::new(self.client.address, self_addr)
+                    .expect("addresses can't differ");
+
                 self.server.prime(primer, self.client.handshake).await?
             }
 

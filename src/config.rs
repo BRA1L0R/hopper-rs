@@ -30,8 +30,13 @@ impl ServerConfig {
     /// (more file exts can be supported through config's features)
     pub fn read() -> Result<Self, ServerConfigError> {
         config::Config::builder()
+            .add_source(
+                Environment::default()
+                    .prefix("HOPPER")
+                    .separator("_")
+                    .try_parsing(true),
+            )
             .add_source(File::new("Config.toml", FileFormat::Toml).required(false))
-            .add_source(Environment::default().prefix("HOPPER"))
             .build()?
             .try_deserialize()
             .map_err(Into::into)

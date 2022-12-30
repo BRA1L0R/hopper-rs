@@ -39,18 +39,6 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     let (names, _, typename) = parse_input!(input);
 
     quote!{
-        // #[automatically_derived]
-        // #[allow(unused_qualifications)]
-        // impl<W: ::std::io::Write> crate::protocol::data::Serialize<W> for #typename {
-        //     fn serialize(&self, writer: &mut W) -> ::std::result::Result<(), crate::protocol::error::ProtoError> {
-        //         #(
-        //             self.#names.serialize(writer)?;
-        //         )*
-
-        //         Ok(())
-        //     }
-        // }
-
         #[automatically_derived]
         #[allow(unused_qualifications)]
         impl crate::protocol::data::Serialize for #typename {

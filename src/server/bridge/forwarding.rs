@@ -1,10 +1,18 @@
-use std::{fmt::Write, net::SocketAddr};
+use std::{
+    fmt::Write,
+    net::{SocketAddr, SocketAddrV4},
+};
 
+use proxy_protocol::{
+    version2::{ProxyAddresses, ProxyCommand, ProxyTransportProtocol},
+    ProxyHeader,
+};
 use serde::Deserialize;
-use tokio::net::TcpStream;
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::{
     protocol::{lazy::DecodedPacket, packet, packets::Handshake, uuid::PlayerUuid},
+    server::client,
     HopperError,
 };
 
@@ -20,6 +28,9 @@ pub enum ForwardStrategy {
     // RealIP <=2.4 support
     #[serde(rename = "realip")]
     RealIP,
+
+    #[serde(rename = "proxy_protocol")]
+    ProxyProtocol,
 }
 
 #[async_trait::async_trait]
@@ -127,6 +138,71 @@ impl ConnectionPrimer for RealIP {
 
         // server.write_serialize(handshake).await?;
         packet::write_serialize(handshake, stream).await?;
+
+        Ok(())
+    }
+}
+
+pub struct ProxyProtocol {
+    client_addr: SocketAddr,
+    dest_addr: SocketAddr,
+}
+
+impl ProxyProtocol {
+    pub fn new(client_addr: SocketAddr, dest_addr: SocketAddr) -> Option<Self> {
+        // both client_addr and dest_addr must be the same
+        // ip version
+        if !matches!(
+            (client_addr, dest_addr),
+            (SocketAddr::V4(_), SocketAddr::V4(_)) | (SocketAddr::V6(_), SocketAddr::V6(_))
+        ) {
+            return None;
+        }
+
+        Some(Self {
+            client_addr,
+            dest_addr,
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl ConnectionPrimer for ProxyProtocol {
+    async fn prime_connection(
+        self,
+        stream: &mut TcpStream,
+        og_handshake: DecodedPacket<Handshake>,
+    ) -> Result<(), HopperError> {
+        // just send along without doing anything
+
+        // they're either both v4 or both v6
+        let proxy_addr = match (self.client_addr, self.dest_addr) {
+            (SocketAddr::V4(source), SocketAddr::V4(destination)) => ProxyAddresses::Ipv4 {
+                source,
+                destination,
+            },
+            (SocketAddr::V6(source), SocketAddr::V6(destination)) => ProxyAddresses::Ipv6 {
+                source,
+                destination,
+            },
+            _ => unreachable!(),
+        };
+
+        let header = proxy_protocol::encode(ProxyHeader::Version2 {
+            command: ProxyCommand::Proxy,
+            transport_protocol: ProxyTransportProtocol::Stream,
+            addresses: proxy_addr,
+        })
+        .unwrap();
+
+        // write proxy header
+        stream
+            .write_all(&header)
+            .await
+            .map_err(HopperError::Disconnected)?;
+
+        // send along handshake as-is
+        og_handshake.as_ref().write_into(stream).await?;
 
         Ok(())
     }
