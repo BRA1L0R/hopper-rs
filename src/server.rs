@@ -91,7 +91,7 @@ impl Hopper {
             })
             .await;
 
-        // log::debug!("Connection terminated, transferred serverbound: {serverbound} bytes clientbound: {clientbound} bytes");
+        log::debug!("Connection terminated, transferred serverbound: {serverbound} bytes clientbound: {clientbound} bytes");
         Ok(())
     }
 

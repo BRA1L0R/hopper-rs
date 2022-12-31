@@ -30,12 +30,12 @@ struct GuardInformation {
 }
 
 #[derive(Debug)]
-pub struct MetricsGuard {
+pub struct MetricsGuard<'a> {
     information: GuardInformation,
-    sender: mpsc::Sender<Event>,
+    sender: &'a mpsc::Sender<Event>,
 }
 
-impl MetricsGuard {
+impl MetricsGuard<'_> {
     pub async fn send_event(&self, event_type: EventType) {
         self.sender
             .send(Event {
@@ -75,7 +75,7 @@ impl Metrics {
 
     pub fn guard(&self, hostname: Hostname, state: State) -> MetricsGuard {
         MetricsGuard {
-            sender: self.sender.clone(),
+            sender: &self.sender,
             information: GuardInformation { hostname, state },
         }
     }
