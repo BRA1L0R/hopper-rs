@@ -47,7 +47,7 @@ impl Hopper {
         metrics: Arc<Metrics>,
     ) -> Result<(), HopperError> {
         // receives a handshake from the client and decodes its information
-        let mut client = IncomingClient::handshake(client).await?;
+        let mut client = IncomingClient::init(client).await?;
 
         // routes a client by reading handshake information
         // then if a route has been found it connects to the server

@@ -5,10 +5,10 @@ use proxy_protocol::{
     ProxyHeader,
 };
 use serde::Deserialize;
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio::io::AsyncWriteExt;
 
 use crate::{
-    protocol::{lazy::DecodedPacket, packet, packets::Handshake, uuid::PlayerUuid},
+    protocol::{connection::Connection, lazy::DecodedPacket, packets::Handshake, uuid::PlayerUuid},
     HopperError,
 };
 
@@ -39,7 +39,7 @@ pub trait ConnectionPrimer {
     /// by the client
     async fn prime_connection(
         self,
-        stream: &mut TcpStream,
+        stream: &mut Connection,
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError>;
 }
@@ -65,7 +65,7 @@ impl BungeeCord {
 impl ConnectionPrimer for BungeeCord {
     async fn prime_connection(
         self,
-        stream: &mut TcpStream,
+        stream: &mut Connection,
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError> {
         let mut handshake = og_handshake.into_data();
@@ -87,7 +87,8 @@ impl ConnectionPrimer for BungeeCord {
         .unwrap();
 
         // send the modified handshake
-        packet::write_serialize(handshake, stream).await?;
+        // packet::write_serialize(handshake, stream).await?;
+        stream.write_serialize(handshake).await?;
 
         Ok(())
     }
@@ -107,7 +108,7 @@ impl RealIP {
 impl ConnectionPrimer for RealIP {
     async fn prime_connection(
         self,
-        stream: &mut TcpStream,
+        stream: &mut Connection,
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError> {
         let mut handshake = og_handshake.into_data();
@@ -133,7 +134,8 @@ impl ConnectionPrimer for RealIP {
             .insert_str(insert_index, &realip_data);
 
         // server.write_serialize(handshake).await?;
-        packet::write_serialize(handshake, stream).await?;
+        // packet::write_serialize(handshake, stream).await?;
+        stream.write_serialize(handshake).await?;
 
         Ok(())
     }
@@ -166,7 +168,7 @@ impl ProxyProtocol {
 impl ConnectionPrimer for ProxyProtocol {
     async fn prime_connection(
         self,
-        stream: &mut TcpStream,
+        stream: &mut Connection,
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError> {
         // just send along without doing anything
@@ -193,12 +195,14 @@ impl ConnectionPrimer for ProxyProtocol {
 
         // write proxy header
         stream
+            .inner()
             .write_all(&header)
             .await
             .map_err(HopperError::Disconnected)?;
 
         // send along handshake as-is
-        og_handshake.as_ref().write_into(stream).await?;
+        // og_handshake.as_ref().write_into(stream).await?;
+        stream.write_packet(og_handshake.as_ref()).await?;
 
         Ok(())
     }
@@ -212,11 +216,11 @@ pub(super) struct Passthrough;
 impl ConnectionPrimer for Passthrough {
     async fn prime_connection(
         self,
-        stream: &mut TcpStream,
+        stream: &mut Connection,
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError> {
         // just send along without doing anything
-        og_handshake.as_ref().write_into(stream).await?;
+        stream.write_packet(og_handshake.as_ref()).await?;
         Ok(())
     }
 }

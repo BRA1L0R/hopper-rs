@@ -1,7 +1,7 @@
 use crate::{
     protocol::{
+        connection::Connection,
         lazy::{DecodedPacket, LazyPacket},
-        packet::{self, Packet},
         packets::{Disconnect, Handshake, LoginStart, State},
     },
     HopperError,
@@ -65,7 +65,7 @@ pub enum NextState {
 pub struct IncomingClient {
     /// user source address
     pub address: SocketAddr,
-    pub stream: TcpStream,
+    pub stream: Connection,
 
     pub handshake: DecodedPacket<Handshake>,
 
@@ -81,7 +81,11 @@ impl IncomingClient {
             return;
         }
 
-        packet::write_serialize(Disconnect::new(reason), &mut self.stream)
+        // packet::write_serialize(Disconnect::new(reason), &mut self.stream)
+        //     .await
+        //     .ok();
+        self.stream
+            .write_serialize(Disconnect::new(reason))
             .await
             .ok();
     }
@@ -91,10 +95,11 @@ impl IncomingClient {
     }
 
     async fn handshake_inner(
-        (mut stream, address): (TcpStream, SocketAddr),
+        (stream, address): (TcpStream, SocketAddr),
     ) -> Result<Self, HopperError> {
-        let handshake: DecodedPacket<Handshake> =
-            Packet::read_from(&mut stream).await?.try_into()?;
+        let mut stream = Connection::new(stream);
+
+        let handshake: DecodedPacket<Handshake> = stream.read_packet().await?.try_into()?;
 
         // sanitize and parse handshake server_address
         let hostname = handshake
@@ -107,7 +112,7 @@ impl IncomingClient {
         // if the next_state is login
         let next_state = match handshake.data().next_state {
             State::Status => NextState::Status,
-            State::Login => NextState::Login(Packet::read_from(&mut stream).await?.try_into()?),
+            State::Login => NextState::Login(stream.read_packet().await?.try_into()?),
         };
 
         Ok(IncomingClient {
@@ -119,7 +124,7 @@ impl IncomingClient {
         })
     }
 
-    pub async fn handshake(connection: (TcpStream, SocketAddr)) -> Result<Self, HopperError> {
+    pub async fn init(connection: (TcpStream, SocketAddr)) -> Result<Self, HopperError> {
         tokio::time::timeout(Duration::from_secs(2), Self::handshake_inner(connection))
             .await
             .map_err(|_| HopperError::TimeOut)?
@@ -134,6 +139,11 @@ impl IncomingClient {
 
         hasher.finish()
     }
+
+    // pub fn connected_to(&self) -> SocketAddr {
+    //     self.stream.inner().loca
+    //     todo!()
+    // }
 }
 
 impl std::fmt::Display for IncomingClient {

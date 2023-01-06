@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use tokio::net::TcpStream;
 
 use crate::{
-    protocol::{lazy::DecodedPacket, packets::Handshake},
+    protocol::{connection::Connection, lazy::DecodedPacket, packets::Handshake},
     HopperError,
 };
 
@@ -19,7 +19,7 @@ pub struct Primed(());
 impl BackendState for Primed {}
 
 pub struct Backend<S: BackendState> {
-    stream: TcpStream,
+    stream: Connection,
     _state: PhantomData<S>,
 }
 
@@ -28,6 +28,8 @@ impl Backend<Connected> {
         let stream = TcpStream::connect(destination.address())
             .await
             .map_err(HopperError::Connect)?;
+
+        let stream = Connection::new(stream);
 
         Ok(Backend {
             stream,
@@ -50,7 +52,7 @@ impl Backend<Connected> {
 }
 
 impl Backend<Primed> {
-    pub fn into_inner(self) -> TcpStream {
+    pub fn into_inner(self) -> Connection {
         self.stream
     }
 }

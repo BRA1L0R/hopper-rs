@@ -67,9 +67,11 @@ impl Bridge {
             }
 
             (_, ForwardStrategy::ProxyProtocol) => {
+                // TODO: do something about this
                 let self_addr = self
                     .client
                     .stream
+                    .inner()
                     .local_addr()
                     .map_err(HopperError::Disconnected)?;
                 let primer = ProxyProtocol::new(self.client.address, self_addr)
@@ -92,11 +94,11 @@ impl Bridge {
         // if the NextState is login the login packet has been read too.
         // Send it to the server as is.
         if let NextState::Login(login) = self.client.next_state {
-            login.as_ref().write_into(&mut server).await?;
+            server.write_packet(login.as_ref()).await?;
         }
 
         // // connect the client and the server in an infinite copy loop
-        let transferred = copy_bidirectional(server, client).await;
+        let transferred = copy_bidirectional(server.into_inner(), client.into_inner()).await;
         Ok(transferred)
     }
 }

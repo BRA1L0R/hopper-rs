@@ -3,6 +3,7 @@ pub mod data;
 pub mod error;
 pub mod packets;
 
+pub mod connection;
 pub mod packet;
 pub mod uuid;
 pub mod varint;
