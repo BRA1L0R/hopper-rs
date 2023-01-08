@@ -37,8 +37,8 @@ impl Serialize for State {
     }
 }
 
-impl<R: Read> Deserialize<R> for State {
-    fn deserialize(reader: &mut R) -> Result<Self, super::error::ProtoError> {
+impl Deserialize for State {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, super::error::ProtoError> {
         let VarInt(next_state) = VarInt::deserialize(reader)?;
         match next_state {
             1 => Ok(State::Status),

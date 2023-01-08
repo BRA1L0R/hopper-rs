@@ -24,7 +24,7 @@ impl<T: PacketId> DecodedPacket<T> {
     }
 }
 
-impl<T: PacketId + for<'a> Deserialize<Cursor<&'a [u8]>>> TryFrom<Packet> for DecodedPacket<T> {
+impl<T: PacketId + Deserialize> TryFrom<Packet> for DecodedPacket<T> {
     type Error = ProtoError;
 
     fn try_from(packet: Packet) -> Result<Self, Self::Error> {
@@ -74,7 +74,7 @@ impl<T: PacketId> AsRef<Packet> for LazyPacket<T> {
 
 impl<T> LazyPacket<T>
 where
-    T: PacketId + for<'a> Deserialize<Cursor<&'a [u8]>>,
+    T: PacketId + Deserialize,
 {
     pub fn data(&mut self) -> Result<&T, ProtoError> {
         match self.data {

@@ -16,8 +16,8 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     quote!{
         #[automatically_derived]
         #[allow(unused_qualifications)]
-        impl<R: ::std::io::Read> crate::protocol::data::Deserialize<R> for #typename {
-            fn deserialize(reader: &mut R) -> ::std::result::Result<Self, crate::protocol::error::ProtoError> {
+        impl crate::protocol::data::Deserialize for #typename {
+            fn deserialize<R: ::std::io::Read>(reader: &mut R) -> ::std::result::Result<Self, crate::protocol::error::ProtoError> {
                 Ok(
                     Self{
                         #(
