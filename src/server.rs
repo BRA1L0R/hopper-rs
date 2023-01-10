@@ -1,18 +1,23 @@
 use std::{net::SocketAddr, sync::Arc};
+use std::sync::Mutex;
+
 use tokio::net::{TcpListener, TcpStream};
+use tokio::signal::unix::Signal;
+
+pub use client::IncomingClient;
+pub use router::Router;
+
+use crate::{
+    metrics::{EventType, injector::MetricsInjector, Metrics},
+    server::{backend::Backend, bridge::Bridge},
+};
+use crate::config::ServerConfig;
+pub use crate::HopperError;
 
 mod backend;
 pub mod bridge;
 pub mod client;
 pub mod router;
-
-pub use crate::HopperError;
-use crate::{
-    metrics::{injector::MetricsInjector, EventType, Metrics},
-    server::{backend::Backend, bridge::Bridge},
-};
-pub use client::IncomingClient;
-pub use router::Router;
 
 macro_rules! try_client {
     ($v:expr, $client:expr, $message:tt) => {
@@ -30,11 +35,11 @@ macro_rules! try_client {
 
 pub struct Hopper {
     metrics: Arc<Metrics>,
-    router: Arc<dyn Router>,
+    router: Arc<Mutex<Arc<dyn Router>>>,
 }
 
 impl Hopper {
-    pub fn new(router: Arc<dyn Router>, injector: Box<dyn MetricsInjector>) -> Self {
+    pub fn new(router: Arc<Mutex<Arc<dyn Router>>>, injector: Box<dyn MetricsInjector>) -> Self {
         Self {
             router,
             metrics: Arc::new(Metrics::init(injector)),
@@ -103,9 +108,8 @@ impl Hopper {
 
             // cheap to clone but it'd be better to clone only if needed
             // TODO: clone only when needed
-            let router = self.router.clone();
+            let router = self.router.clone().lock().unwrap().clone();
             let metrics = self.metrics.clone();
-
             // creates a new task for each client
             tokio::spawn(async move {
                 if let Err(err) = Self::handler(client, router, metrics).await {
@@ -118,5 +122,21 @@ impl Hopper {
             // into a tight loop and monopolize cpu
             tokio::task::yield_now().await
         }
+    }
+
+    pub(crate) fn listen_config(&self, mut stream: Signal) {
+        let router = self.router.clone();
+        tokio::spawn(async move {
+            loop {
+                stream.recv().await;
+
+                let config = ServerConfig::read().expect("Unable to read config");
+
+                let mut rt = router.lock().unwrap();
+                *rt = Arc::new(config.routing);
+
+                log::info!("Reloaded routing.")
+            }
+        });
     }
 }

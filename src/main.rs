@@ -1,4 +1,5 @@
 use std::{convert::Infallible, sync::Arc};
+use std::sync::Mutex;
 
 use crate::config::{metrics::MetricsConfig, ServerConfig};
 use log::LevelFilter;
@@ -6,6 +7,7 @@ use metrics::injector::EmptyInjector;
 use server::Hopper;
 use simple_logger::SimpleLogger;
 use tokio::{main, net::TcpListener, select};
+use tokio::signal::unix::{signal, SignalKind};
 
 pub use crate::error::HopperError;
 
@@ -37,7 +39,9 @@ async fn run() -> Result<Infallible, HopperError> {
         .unwrap_or_else(|| Box::new(EmptyInjector));
 
     // builds a new hopper instance with a router
-    let server = Hopper::new(Arc::new(config.routing), metrics);
+    let server = Hopper::new(Arc::new(Mutex::new(Arc::new(config.routing))), metrics);
+
+    server.listen_config(signal(SignalKind::hangup()).expect("Unable to get signal"));
 
     select! {
         _ = server.listen(listener) => unreachable!(),
