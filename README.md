@@ -143,7 +143,7 @@ There are two ways to run hopper:
 - Using the [docker image](#docker-)
 - Using the [binaries](#binary-)
 
-### Docker ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/bra1l0r/hopper-rs/Docker%20build%20and%20registry%20push?label=Container%20Build&style=flat-square)
+### Docker ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bra1l0r/hopper-rs/docker.yml?label=Container%20Build&style=flat-square)
 
 - Pull the latest image from the GitHub registry:
 
@@ -173,7 +173,7 @@ services:
       - ./Config.toml:/Config.toml
 ```
 
-### Binary ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/bra1l0r/hopper-rs/Build%20and%20release%20on%20github?label=Artifact%20Release&style=flat-square)
+### Binary ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bra1l0r/hopper-rs/build.yml?label=Artifact%20Release&style=flat-square)
 
 You can either download the [latest release](https://github.com/BRA1L0R/hopper-rs/releases) **(recommended)** or follow the steps below to build your own binary:
 
