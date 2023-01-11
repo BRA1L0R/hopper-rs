@@ -439,11 +439,10 @@ dependencies = [
 
 [[package]]
 name = "hopper"
-version = "0.4.8"
+version = "0.4.9"
 dependencies = [
  "async-trait",
  "byteorder",
- "bytes",
  "config",
  "futures",
  "hopper_macros",
@@ -457,7 +456,6 @@ dependencies = [
  "simple_logger",
  "thiserror",
  "tokio",
- "tokio-io-timeout",
  "uuid",
 ]
 
@@ -1464,16 +1462,6 @@ dependencies = [
  "socket2",
  "tokio-macros",
  "winapi",
-]
-
-[[package]]
-name = "tokio-io-timeout"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30b74022ada614a1b4834de765f9bb43877f910cc8ce4be40e89042c9223a8bf"
-dependencies = [
- "pin-project-lite",
- "tokio",
 ]
 
 [[package]]

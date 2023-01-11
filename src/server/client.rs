@@ -18,12 +18,6 @@ use std::{
 };
 use tokio::net::TcpStream;
 
-// #[derive(Error, Debug)]
-// pub enum ClientError {
-//     #[error("player sent invalid handshake data")]
-//     Invalid,
-// }
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 /// verified hostname destination
 pub struct Hostname(Arc<str>);
@@ -77,13 +71,10 @@ pub struct IncomingClient {
 
 impl IncomingClient {
     pub async fn disconnect(mut self, reason: impl Into<String>) {
-        if !matches!(self.handshake.data().next_state, State::Login) {
+        if matches!(self.handshake.data().next_state, State::Status) {
             return;
         }
 
-        // packet::write_serialize(Disconnect::new(reason), &mut self.stream)
-        //     .await
-        //     .ok();
         self.stream
             .write_serialize(Disconnect::new(reason))
             .await
@@ -148,6 +139,6 @@ impl IncomingClient {
 
 impl std::fmt::Display for IncomingClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.address)
+        self.address.fmt(f)
     }
 }

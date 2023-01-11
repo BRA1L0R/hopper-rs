@@ -36,7 +36,7 @@ impl Packet {
 
     pub fn deserialize_owned<T>(&self) -> Result<T, ProtoError>
     where
-        T: for<'a> Deserialize<Cursor<&'a [u8]>> + PacketId + 'static,
+        T: Deserialize + PacketId + 'static,
     {
         (self.packet_id == T::ID)
             .then(|| T::deserialize(&mut self.data_cursor()))

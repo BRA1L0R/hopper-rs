@@ -36,22 +36,8 @@ impl Connection {
     where
         T: Serialize + PacketId,
     {
-        let packet_id = VarInt::from(T::ID);
-        let mut buf = Vec::with_capacity(packet_id.min_size() + data.min_size());
-
-        packet_id.serialize(&mut buf).unwrap();
-        data.serialize(&mut buf).unwrap();
-
-        let packet_len = VarInt(buf.len() as i32);
-        let mut packet_len_buf = Cursor::new([0; 5]);
-        let len_size = packet_len_buf.write_varint(packet_len)?;
-
-        self.inner
-            .write_all(&packet_len_buf.into_inner()[..len_size])
-            .await?;
-        self.inner.write_all(&buf).await?;
-
-        Ok(len_size + buf.len())
+        let packet = Packet::serialize(&data)?;
+        self.write_packet(&packet).await
     }
 
     /// Reads a packet from the stream

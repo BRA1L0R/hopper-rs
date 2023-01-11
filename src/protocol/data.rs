@@ -11,12 +11,12 @@ pub trait PacketId {
     const ID: i32;
 }
 
-pub trait Deserialize<R>: Sized + 'static {
-    fn deserialize(reader: &mut R) -> Result<Self, ProtoError>;
+pub trait Deserialize: Sized + 'static {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, ProtoError>;
 }
 
-impl<R: Read> Deserialize<R> for String {
-    fn deserialize(reader: &mut R) -> Result<String, ProtoError> {
+impl Deserialize for String {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<String, ProtoError> {
         const MAX_CHARS: usize = 32767;
         const MAX_BYTES: usize = MAX_CHARS * 4;
 
@@ -37,8 +37,8 @@ impl<R: Read> Deserialize<R> for String {
     }
 }
 
-impl<R: Read> Deserialize<R> for u16 {
-    fn deserialize(reader: &mut R) -> Result<Self, ProtoError> {
+impl Deserialize for u16 {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, ProtoError> {
         reader.read_u16::<BigEndian>().map_err(Into::into)
     }
 }

@@ -45,8 +45,8 @@ impl PartialEq<i32> for VarInt {
     }
 }
 
-impl<R: Read> Deserialize<R> for VarInt {
-    fn deserialize(reader: &mut R) -> Result<Self, ProtoError> {
+impl Deserialize for VarInt {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, ProtoError> {
         reader.read_varint().map(|(_, varint)| varint)
     }
 }
