@@ -14,9 +14,9 @@ pub struct Chat(String);
 impl Serialize for Chat {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
         let chat = json!({ "text": self.0 });
-        let chat = serde_json::to_string(&chat).unwrap();
+        serde_json::to_writer(writer, &chat).unwrap();
 
-        chat.serialize(writer)
+        Ok(())
     }
 }
 

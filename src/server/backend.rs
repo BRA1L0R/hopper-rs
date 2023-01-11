@@ -1,15 +1,13 @@
 //! Destination server
 
 use std::marker::PhantomData;
-
 use tokio::net::TcpStream;
 
+use super::{bridge::forwarding::ConnectionPrimer, router::Destination};
 use crate::{
     protocol::{connection::Connection, lazy::DecodedPacket, packets::Handshake},
     HopperError,
 };
-
-use super::{bridge::forwarding::ConnectionPrimer, router::Destination};
 
 pub trait BackendState {}
 
@@ -25,9 +23,13 @@ pub struct Backend<S: BackendState> {
 
 impl Backend<Connected> {
     pub async fn connect(destination: &Destination) -> Result<Self, HopperError> {
-        let stream = TcpStream::connect(destination.address())
-            .await
-            .map_err(HopperError::Connect)?;
+        let stream = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            TcpStream::connect(destination.address()),
+        )
+        .await
+        .map_err(|_| HopperError::TimeOut)?
+        .map_err(HopperError::Connect)?;
 
         let stream = Connection::new(stream);
 
