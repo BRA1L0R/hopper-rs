@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use super::{
-    data::{Deserialize, PacketId, Serialize},
+    encoding::{Deserialize, PacketId, Serialize},
     error::ProtoError,
     VarInt,
 };

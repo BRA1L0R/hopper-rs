@@ -4,7 +4,7 @@ use hopper_macros::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::{
-    data::{Deserialize, PacketId, Serialize},
+    encoding::{Deserialize, PacketId, Serialize},
     error::ProtoError,
     VarInt,
 };
@@ -14,9 +14,11 @@ pub struct Chat(String);
 impl Serialize for Chat {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError> {
         let chat = json!({ "text": self.0 });
-        serde_json::to_writer(writer, &chat).unwrap();
+        // MUST write to a string buffer beforehand
+        // to know its final length
+        let chat = serde_json::to_string(&chat).unwrap();
 
-        Ok(())
+        chat.serialize(writer)
     }
 }
 

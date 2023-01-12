@@ -4,7 +4,7 @@ mod write;
 use std::io::{Read, Write};
 
 use super::{
-    data::{Deserialize, Serialize},
+    encoding::{Deserialize, Serialize},
     error::ProtoError,
 };
 

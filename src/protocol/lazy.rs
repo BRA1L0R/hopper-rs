@@ -1,12 +1,12 @@
 use super::{
-    data::{Deserialize, PacketId},
+    encoding::{Deserialize, PacketId},
     error::ProtoError,
     packet::Packet,
 };
 use std::io::Cursor;
 
 /// Represents a decoded packet. While lazy packet may be
-/// decoded or still be raw, this struct sgnifies that a decoding
+/// decoded or still be raw, this struct guarantees that a decoding
 /// action took place and doesn't require a &mut self for accessing
 /// the data inside
 pub struct DecodedPacket<T: PacketId> {
@@ -19,12 +19,14 @@ impl<T: PacketId> DecodedPacket<T> {
         self.data
     }
 
+    /// returns an immutable reference to guarantee
+    /// that the original packet data is left untouched
     pub fn data(&self) -> &T {
         &self.data
     }
 }
 
-impl<T: PacketId + Deserialize> TryFrom<Packet> for DecodedPacket<T> {
+impl<T: PacketId + Deserialize + 'static> TryFrom<Packet> for DecodedPacket<T> {
     type Error = ProtoError;
 
     fn try_from(packet: Packet) -> Result<Self, Self::Error> {
@@ -44,6 +46,9 @@ impl<T: PacketId> AsRef<Packet> for DecodedPacket<T> {
 }
 
 /// A packet that might have been decoded or not
+///
+/// Useful if you don't necessarily have to deserialize
+/// a packet unless a certain condition is met.
 pub struct LazyPacket<T: PacketId> {
     packet: Packet,
     data: Option<T>,
@@ -74,7 +79,7 @@ impl<T: PacketId> AsRef<Packet> for LazyPacket<T> {
 
 impl<T> LazyPacket<T>
 where
-    T: PacketId + Deserialize,
+    T: PacketId + Deserialize + 'static,
 {
     pub fn data(&mut self) -> Result<&T, ProtoError> {
         match self.data {

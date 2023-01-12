@@ -8,7 +8,7 @@ use super::packet::Packet;
 use super::varint::ReadVarIntExtAsync;
 use super::SIZE_LIMIT;
 use super::{
-    data::{PacketId, Serialize},
+    encoding::{PacketId, Serialize},
     error::ProtoError,
     VarInt,
 };

@@ -16,7 +16,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     quote!{
         #[automatically_derived]
         #[allow(unused_qualifications)]
-        impl crate::protocol::data::Deserialize for #typename {
+        impl crate::protocol::encoding::Deserialize for #typename {
             fn deserialize<R: ::std::io::Read>(reader: &mut R) -> ::std::result::Result<Self, crate::protocol::error::ProtoError> {
                 Ok(
                     Self{
@@ -41,7 +41,7 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     quote!{
         #[automatically_derived]
         #[allow(unused_qualifications)]
-        impl crate::protocol::data::Serialize for #typename {
+        impl crate::protocol::encoding::Serialize for #typename {
             fn serialize<W: ::std::io::Write>(&self, writer: &mut W) -> ::std::result::Result<(), crate::protocol::error::ProtoError> {
                 #(
                     self.#names.serialize(writer)?;

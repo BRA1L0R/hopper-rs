@@ -7,6 +7,7 @@ pub mod connection;
 pub mod packet;
 pub mod uuid;
 pub mod varint;
+pub mod encoding;
 pub use varint::VarInt;
 pub mod lazy;
 

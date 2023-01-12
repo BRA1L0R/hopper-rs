@@ -5,15 +5,12 @@ use std::{
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use super::{error::ProtoError, varint::WriteVarIntExt, VarInt};
-
-pub trait PacketId {
-    const ID: i32;
-}
-
-pub trait Deserialize: Sized + 'static {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, ProtoError>;
-}
+use super::{
+    encoding::{Deserialize, Serialize},
+    error::ProtoError,
+    varint::WriteVarIntExt,
+    VarInt,
+};
 
 impl Deserialize for String {
     fn deserialize<R: Read>(reader: &mut R) -> Result<String, ProtoError> {
@@ -40,14 +37,6 @@ impl Deserialize for String {
 impl Deserialize for u16 {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, ProtoError> {
         reader.read_u16::<BigEndian>().map_err(Into::into)
-    }
-}
-
-pub trait Serialize: Sized + Send {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), ProtoError>;
-
-    fn min_size(&self) -> usize {
-        0
     }
 }
 
