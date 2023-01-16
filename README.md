@@ -11,6 +11,7 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 **FEATURES:**
 
 - [x] Load balancing
+- [x] [Hot reload](#hot-reload)
 - [x] [IP Forwarding](#ip-forwarding)
 - [x] [HAProxy v2 (PROXY protocol)](#proxy-protocol-aka-haproxy-v2)
 - [x] [RealIP](#realip) 2.4 support
@@ -19,9 +20,28 @@ NOTE: this proxy is still heavily under development, and a lot of new features a
 - [ ] Webhook callbacks for events
 - [ ] Plugin system for Docker and hosting provider integrations
 
+## Index
+- [Configuration](#configuration)
+  - [Load balancing](#load-balancing)
+  - [IP Forwarding](#ip-forwarding)
+    - [Bungeecord](#bungeecord)
+    - [RealIP](#realip)
+    - [PROXY Protocol](#proxy-protocol-aka-haproxy-v2) (HAProxy)
+  - [Metrics](#logging-metrics-with-influxdb)
+- [Building and running](#how-to-run)
+  - [Docker](#docker-github-workflow-status)
+    - [docker-compose configuration](#using-docker-compose-recommended)
+  - [Binary](#binary-github-workflow-status)
+    - [Systemd service configuration](#systemd-configuration)
+- [Log verbosity](#changing-the-verbosity-level)
+- [Hot reload](#hot-reload)
+
 ## Configuration
 
-Example `Config.toml`:
+To **quickly** get started checkout this example configuration:
+
+<details>
+<summary>Example <code>Config.toml</code>:</summary>
 
 ```toml
 # the address hopper will listen on
@@ -53,6 +73,21 @@ default = { ip = "127.0.0.1:12345" } # optional
 
 # this will load balance between the two servers
 "other.gaming.tk" = { ip = ["127.0.0.1:25009", "10.1.0.1:25123"] }
+```
+</details>
+<br/>
+
+### Load balancing
+
+Hopper's load balancer is a hash distributor based on the player's source IP and port.
+
+You can load balance players between two backend servers by specifying a **list**
+of ip addresses instead of a single address.
+
+
+```toml
+[routing]
+default = { ip = ["1.1.1.1:25565", "2.2.2.2:25577"] } # works on non-default routes too
 ```
 
 ### IP Forwarding
@@ -191,6 +226,31 @@ cargo build --release
 
 - The runnable binary will now be available at `target/release/hopper`
 
+#### Systemd configuration
+
+Assuming both the `hopper` binary and `Config.toml` configuration file
+are located inside `/opt/hopper`, you can extend this systemd configuration
+that supports both the `stop` and `reload` commands.
+
+It is **strongly** advised not to use the root user as a best practice,
+however this configuration does use it and is to be intended as a **template**.
+
+```
+[Unit]
+Description=Hopper reverse proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/hopper/hopper
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -SIGINT $MAINPID
+WorkingDirectory=/opt/hopper
+
+[Install]
+WantedBy=multi-user.target
+```
+
 ## Changing the verbosity level
 
 If you think something is off with your instance and want to enable debug logging, or you just want to reduce the default talkativeness of hopper you must choose your desired level of verbosity through the `RUST_LOG` environment variable.
@@ -210,4 +270,24 @@ Example:
 RUST_LOG="debug" ./hopper
 ```
 
-TODO: running information with systemd configuration example
+## Hot reload
+
+Hot reloading of Config.toml is supported only on linux as it provides the best way
+to signal the process to perform a hot reload.
+
+If you think you know how something similar might be implemented in Windows
+please [open an issue](https://github.com/BRA1L0R/hopper-rs/issues) explaining
+your idea.
+
+Hopper supports hot reloading through the `SIGHUP` process signal. Just like
+nginx. A rudimentary example of doing this would be through the `kill` command:
+
+```
+kill -s sighup <process PID>
+```
+
+If the new configuration contains the reload is **aborted** and the server **continues
+running** with the previous configuration.
+
+You can automate this with systemd, allowing for the handy `systemctl reload <service>` shortcut,
+as you can see explained [here](#systemd-configuration).

@@ -1,9 +1,10 @@
 use self::injector::{MetricsError, MetricsInjector};
 use crate::{protocol::packets::State, server::client::Hostname};
-use std::{collections::HashMap, convert::Infallible, time::Duration};
+use std::{collections::HashMap, time::Duration};
 use tokio::{
     select,
     sync::mpsc::{self, Receiver},
+    task::JoinHandle,
     time,
 };
 
@@ -62,15 +63,22 @@ pub type Counters = HashMap<Hostname, HostnameCounter>;
 
 pub struct Metrics {
     sender: mpsc::Sender<Event>,
+    handler: JoinHandle<()>,
+}
+
+impl Drop for Metrics {
+    fn drop(&mut self) {
+        self.handler.abort();
+    }
 }
 
 impl Metrics {
     pub fn init(injector: Box<dyn MetricsInjector>) -> Self {
         let (sender, receiver) = mpsc::channel::<Event>(8096);
 
-        tokio::spawn(Metrics::metrics_handler(receiver, injector));
+        let handler = tokio::spawn(Metrics::metrics_handler(receiver, injector));
 
-        Self { sender }
+        Self { sender, handler }
     }
 
     pub fn guard(&self, hostname: Hostname, state: State) -> MetricsGuard {
@@ -80,15 +88,13 @@ impl Metrics {
         }
     }
 
-    async fn metrics_handler(
-        mut receiver: Receiver<Event>,
-        injector: Box<dyn MetricsInjector>,
-    ) -> Result<Infallible, MetricsError> {
+    async fn metrics_handler(mut receiver: Receiver<Event>, injector: Box<dyn MetricsInjector>) {
         let mut counters: Counters = Default::default();
         let mut register_interval = time::interval(Duration::from_secs(5));
 
         loop {
             let event = select! {
+                biased;
                 _ = register_interval.tick() => {
                     if let Err(err) = injector.log(&counters).await { log::error!("InfluxDB reported an error: {err}") };
                     continue
