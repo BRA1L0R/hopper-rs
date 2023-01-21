@@ -106,8 +106,8 @@ impl Bridge {
 /// Uses an external transferred counter so in an event of an error or
 /// when the future gets dropped by the select data still gets recorded
 async fn pipe(mut input: OwnedReadHalf, mut output: OwnedWriteHalf, transferred: &mut u64) {
-    // A 1024 bytes buffer should be big enough
-    let mut buffer = [0u8; 1024];
+    // Accomodate the average MTU of tcp connections
+    let mut buffer = [0u8; 2048];
 
     // read from the socket into the buffer, increment the transfer counter
     // and then write all to the other end of the pipe
