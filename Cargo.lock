@@ -446,7 +446,6 @@ dependencies = [
  "bytes",
  "config",
  "futures",
- "hopper_macros",
  "hostname",
  "influxdb2",
  "log",
@@ -460,14 +459,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "uuid",
-]
-
-[[package]]
-name = "hopper_macros"
-version = "0.2.1"
-dependencies = [
- "quote",
- "syn 1.0.98",
 ]
 
 [[package]]
