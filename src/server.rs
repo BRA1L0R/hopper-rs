@@ -69,14 +69,13 @@ impl Hopper {
 
         // create a metricsguard which contains a channel where
         // events are sent, and then added to the metrics state
-        let guard = metrics.guard(client.hostname.clone(), client.handshake.data().next_state);
+        let guard = metrics.guard(client.hostname.clone(), client.handshake.next_state);
 
         let bridge = Bridge::new(backend, client, route.strategy());
 
         // bridge returns the used traffic in form of bytes
         // transited from client to server and vice versa
         guard.send_event(EventType::Connect).await;
-        // let bridge_result = route.bridge(client).await;
         let bridge_result = bridge.bridge().await;
         guard.send_event(EventType::Disconnect).await;
 

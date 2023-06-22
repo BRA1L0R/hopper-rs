@@ -1,6 +1,9 @@
 pub mod forwarding;
 
-use crate::HopperError;
+use crate::{
+    protocol::connection::{Codec, Connection, ConnectionError},
+    HopperError,
+};
 
 use self::forwarding::{BungeeCord, ForwardStrategy, Passthrough, ProxyProtocol, RealIP};
 
@@ -9,6 +12,8 @@ use super::{
     client::{IncomingClient, NextState},
 };
 
+use futures::SinkExt;
+use netherite::packet::RawPacket;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
@@ -39,10 +44,6 @@ impl Bridge {
         }
     }
 
-    // pub fn address(&self) -> Result<SocketAddr, HopperError> {
-    //     self.stream.peer_addr().map_err(HopperError::Disconnected)
-    // }
-
     /// handshakes an already connected server and
     /// joins two piping futures, bridging the two connections
     /// at Layer 4.
@@ -54,32 +55,21 @@ impl Bridge {
             (NextState::Login(login), ForwardStrategy::BungeeCord) => {
                 // bungeecord forwarding requires username
                 // for UUID calculation
-                let username = &login.data()?.username;
-                let primer = BungeeCord::from_username(self.client.address, username);
+
+                let login_start = login.data()?;
+                let primer = BungeeCord::from_username(self.client.address, &login_start.username);
 
                 self.server.prime(primer, self.client.handshake).await?
             }
-
             // realip works both for login and ping
             (_, ForwardStrategy::RealIP) => {
                 let primer = RealIP::new(self.client.address);
                 self.server.prime(primer, self.client.handshake).await?
             }
-
             (_, ForwardStrategy::ProxyProtocol) => {
-                // TODO: do something about this
-                let self_addr = self
-                    .client
-                    .stream
-                    .inner()
-                    .local_addr()
-                    .map_err(HopperError::Disconnected)?;
-                let primer = ProxyProtocol::new(self.client.address, self_addr)
-                    .expect("addresses can't differ");
-
+                let primer = ProxyProtocol::new(self.client.address);
                 self.server.prime(primer, self.client.handshake).await?
             }
-
             // default handler does not forward anything
             _ => {
                 self.server
@@ -88,19 +78,45 @@ impl Bridge {
             }
         };
 
-        let client = self.client.stream;
+        let client = self.client.connection;
         let mut server = server.into_inner();
 
         // if the NextState is login the login packet has been read too.
         // Send it to the server as is.
-        if let NextState::Login(login) = self.client.next_state {
-            server.write_packet(login.as_ref()).await?;
+        if let NextState::Login(ref login) = self.client.next_state {
+            server.feed_raw_packet(login).await?;
         }
 
-        // // connect the client and the server in an infinite copy loop
-        let transferred = copy_bidirectional(server.into_inner(), client.into_inner()).await;
+        let (client, server) = flush_bidirectional(client, server).await?;
+
+        // connect the client and the server in an infinite copy loop
+        let transferred = copy_bidirectional(server, client).await;
         Ok(transferred)
     }
+}
+
+async fn flush_bidirectional(
+    client: Connection,
+    server: Connection,
+) -> Result<(TcpStream, TcpStream), ConnectionError> {
+    let mut client = client.into_inner();
+    let mut server = server.into_inner();
+
+    client
+        .write_buffer_mut()
+        .extend_from_slice(server.read_buffer());
+
+    server
+        .write_buffer_mut()
+        .extend_from_slice(client.read_buffer());
+
+    <Codec as SinkExt<&RawPacket>>::flush(&mut client).await?;
+    <Codec as SinkExt<&RawPacket>>::flush(&mut server).await?;
+
+    debug_assert!(server.write_buffer().is_empty());
+    debug_assert!(client.write_buffer().is_empty());
+
+    Ok((client.into_inner(), server.into_inner()))
 }
 
 /// Uses an external transferred counter so in an event of an error or

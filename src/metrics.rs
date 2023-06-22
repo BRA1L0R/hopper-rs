@@ -1,5 +1,5 @@
 use self::injector::{MetricsError, MetricsInjector};
-use crate::{protocol::packets::State, server::client::Hostname};
+use crate::{protocol::packet_impls::State, server::client::Hostname};
 use std::{collections::HashMap, time::Duration};
 use tokio::{
     select,
@@ -89,7 +89,9 @@ impl Metrics {
     }
 
     async fn metrics_handler(mut receiver: Receiver<Event>, injector: Box<dyn MetricsInjector>) {
+        #[allow(clippy::mutable_key_type)] // allowed for bytes::Bytes
         let mut counters: Counters = Default::default();
+
         let mut register_interval = time::interval(Duration::from_secs(5));
 
         loop {

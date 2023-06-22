@@ -2,15 +2,17 @@ use thiserror::Error;
 
 use crate::{
     config::ServerConfigError,
-    // metrics::MetricsError,
-    protocol::error::ProtoError,
+    protocol::connection::{ConnectionError, ProtoError},
     server::router::RouterError,
 };
 
 #[derive(Error, Debug)]
 pub enum HopperError {
-    #[error("protocol error: {0}")]
-    Protocol(#[from] ProtoError),
+    #[error("codec error: {0}")]
+    Connection(#[from] ConnectionError),
+
+    #[error("encoding error: {0}")]
+    Encoding(#[from] ProtoError),
 
     #[error("routing error: {0}")]
     Router(#[from] RouterError),

@@ -1,44 +1,37 @@
-use crate::{
-    protocol::{
-        connection::Connection,
-        lazy::{DecodedPacket, LazyPacket},
-        packets::{Disconnect, Handshake, LoginStart, State},
-    },
-    HopperError,
-};
+use netherite::encoding::str::Str;
 use std::{
     collections::hash_map::DefaultHasher,
     error::Error,
     hash::{Hash, Hasher},
     net::SocketAddr,
     ops::Deref,
-    str::FromStr,
-    sync::Arc,
     time::Duration,
 };
 use tokio::net::TcpStream;
 
+use crate::{
+    protocol::{
+        connection::Connection,
+        packet::{DecodedPacket, LazyPacket},
+        packet_impls::{Disconnect, Handshake, JsonChat, LoginStart, State},
+    },
+    HopperError,
+};
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 /// verified hostname destination
-pub struct Hostname(Arc<str>);
-
-pub struct NoHostname;
+pub struct Hostname(Str);
 
 impl Hostname {
-    pub fn into_inner(self) -> Arc<str> {
-        self.0
-    }
-}
-
-impl FromStr for Hostname {
-    type Err = NoHostname;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.split(|c| c == '\x00' || c == '/')
+    fn from_str(s: &Str) -> Option<Self> {
+        let substr = s
+            .split(|c| c == '\x00' || c == '/')
             .next()
-            .ok_or(NoHostname)
-            .map(Into::into)
-            .map(Hostname)
+            .filter(|&str| !str.is_empty())?;
+
+        let inner = s.slice(substr);
+
+        Some(Self(inner))
     }
 }
 
@@ -56,27 +49,31 @@ pub enum NextState {
     Status,
 }
 
+// TODO: reorder fields
+
 pub struct IncomingClient {
     /// user source address
     pub address: SocketAddr,
-    pub stream: Connection,
+    pub connection: Connection,
 
     pub handshake: DecodedPacket<Handshake>,
+    pub next_state: NextState,
 
     /// Sanitized hostname, differs from handshake.server_address as that
     /// may still contain extra information.
     pub hostname: Hostname,
-    pub next_state: NextState,
 }
 
 impl IncomingClient {
-    pub async fn disconnect(mut self, reason: impl Into<String>) {
-        if matches!(self.handshake.data().next_state, State::Status) {
+    pub async fn disconnect(mut self, reason: impl AsRef<str>) {
+        if matches!(self.next_state, NextState::Status) {
             return;
         }
 
-        self.stream
-            .write_serialize(Disconnect::new(reason))
+        let chat = JsonChat::new(reason.as_ref());
+
+        self.connection
+            .feed_packet(Disconnect::from_chat(&chat))
             .await
             .ok();
     }
@@ -88,27 +85,21 @@ impl IncomingClient {
     async fn handshake_inner(
         (stream, address): (TcpStream, SocketAddr),
     ) -> Result<Self, HopperError> {
-        let mut stream = Connection::new(stream);
+        let mut connection = Connection::new(stream);
+        let handshake: DecodedPacket<Handshake> = connection.read_packet().await?.try_into()?;
 
-        let handshake: DecodedPacket<Handshake> = stream.read_packet().await?.try_into()?;
-
-        // sanitize and parse handshake server_address
-        let hostname = handshake
-            .data()
-            .server_address
-            .parse()
-            .map_err(|_| HopperError::Invalid)?;
+        let hostname = Hostname::from_str(&handshake.server_address).ok_or(HopperError::Invalid)?;
 
         // only read LoginStart information (containing the username)
         // if the next_state is login
-        let next_state = match handshake.data().next_state {
+        let next_state = match handshake.next_state {
             State::Status => NextState::Status,
-            State::Login => NextState::Login(stream.read_packet().await?.try_into()?),
+            State::Login => NextState::Login(connection.read_packet().await?.try_into()?),
         };
 
         Ok(IncomingClient {
             address,
-            stream,
+            connection,
             hostname,
             handshake,
             next_state,
@@ -130,15 +121,33 @@ impl IncomingClient {
 
         hasher.finish()
     }
-
-    // pub fn connected_to(&self) -> SocketAddr {
-    //     self.stream.inner().loca
-    //     todo!()
-    // }
 }
 
 impl std::fmt::Display for IncomingClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.address.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use netherite::encoding::str::Str;
+
+    use super::Hostname;
+
+    #[test]
+    fn test_hostname() {
+        let hostname = Str::from_static("hello\x00extra");
+
+        let res = Hostname::from_str(&hostname).unwrap();
+        assert_eq!(&res.0, "hello")
+    }
+
+    #[test]
+    fn test_invalid() {
+        let hostname = Str::from_static("\x00extra");
+        let res = Hostname::from_str(&hostname);
+
+        assert!(res.is_none())
     }
 }

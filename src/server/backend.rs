@@ -5,7 +5,7 @@ use tokio::net::TcpStream;
 
 use super::{bridge::forwarding::ConnectionPrimer, router::Destination};
 use crate::{
-    protocol::{connection::Connection, lazy::DecodedPacket, packets::Handshake},
+    protocol::{connection::Connection, packet::DecodedPacket, packet_impls::Handshake},
     HopperError,
 };
 

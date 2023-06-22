@@ -1,14 +1,20 @@
 use std::{fmt::Write, net::SocketAddr};
 
+use bytes::BufMut;
+
 use proxy_protocol::{
     version2::{ProxyAddresses, ProxyCommand, ProxyTransportProtocol},
     ProxyHeader,
 };
 use serde::Deserialize;
-use tokio::io::AsyncWriteExt;
 
 use crate::{
-    protocol::{connection::Connection, lazy::DecodedPacket, packets::Handshake, uuid::PlayerUuid},
+    protocol::{
+        connection::Connection,
+        packet::DecodedPacket,
+        packet_impls::{Handshake, NewHandshake},
+        types::PlayerUuid,
+    },
     HopperError,
 };
 
@@ -68,7 +74,7 @@ impl ConnectionPrimer for BungeeCord {
         stream: &mut Connection,
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError> {
-        let mut handshake = og_handshake.into_data();
+        let handshake = og_handshake.into_data();
 
         // if handshake contains a null character it means that
         // someone is trying to hijack the connection or trying to
@@ -78,17 +84,19 @@ impl ConnectionPrimer for BungeeCord {
         }
 
         // https://github.com/SpigotMC/BungeeCord/blob/8d494242265790df1dc6d92121d1a37b726ac405/proxy/src/main/java/net/md_5/bungee/ServerConnector.java#L91-L106
+
+        let mut handshake: NewHandshake = handshake.into();
         write!(
             handshake.server_address,
             "\x00{}\x00{}",
             self.player_addr.ip(),
             self.player_uuid
         )
-        .unwrap();
+        .ok();
 
         // send the modified handshake
         // packet::write_serialize(handshake, stream).await?;
-        stream.write_serialize(handshake).await?;
+        stream.feed_packet(handshake).await?;
 
         Ok(())
     }
@@ -111,31 +119,40 @@ impl ConnectionPrimer for RealIP {
         stream: &mut Connection,
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError> {
-        let mut handshake = og_handshake.into_data();
+        let Handshake {
+            protocol_version,
+            server_address,
+            server_port,
+            next_state,
+        } = og_handshake.into_data();
 
         // if the original handshake contains these character
         // the client is trying to hijack realip
-        if handshake.server_address.contains('/') {
+        if server_address.contains('/') {
             return Err(HopperError::Invalid);
         }
 
         // FML support
-        let insert_index = handshake
-            .server_address
+        let insert_index = server_address
             .find('\x00')
             .map(|a| a - 1)
-            .unwrap_or(handshake.server_address.len());
+            .unwrap_or(server_address.len());
+
+        let mut server_address = server_address.to_string();
 
         // bungeecord and realip forwarding have a very similar structure
         // write!(handshake.server_address, "///{}", client.address).unwrap();
-        let realip_data = format!("///{}", self.player_addr);
-        handshake
-            .server_address
-            .insert_str(insert_index, &realip_data);
+        let realip_data = format!("{}///{}", server_address, self.player_addr);
+        server_address.insert_str(insert_index, &realip_data);
 
-        // server.write_serialize(handshake).await?;
-        // packet::write_serialize(handshake, stream).await?;
-        stream.write_serialize(handshake).await?;
+        let handshake = NewHandshake {
+            protocol_version,
+            server_port,
+            next_state,
+            server_address,
+        };
+
+        stream.feed_packet(handshake).await?;
 
         Ok(())
     }
@@ -147,20 +164,16 @@ pub struct ProxyProtocol {
 }
 
 impl ProxyProtocol {
-    pub fn new(client_addr: SocketAddr, dest_addr: SocketAddr) -> Option<Self> {
-        // both client_addr and dest_addr must be the same
-        // ip version
-        if !matches!(
-            (client_addr, dest_addr),
-            (SocketAddr::V4(_), SocketAddr::V4(_)) | (SocketAddr::V6(_), SocketAddr::V6(_))
-        ) {
-            return None;
-        }
+    pub fn new(client_addr: SocketAddr) -> Self {
+        let dest_addr = match client_addr {
+            SocketAddr::V4(_) => SocketAddr::new([0; 4].into(), 0),
+            SocketAddr::V6(_) => SocketAddr::new([0; 16].into(), 0),
+        };
 
-        Some(Self {
+        Self {
             client_addr,
             dest_addr,
-        })
+        }
     }
 }
 
@@ -194,15 +207,11 @@ impl ConnectionPrimer for ProxyProtocol {
         .unwrap();
 
         // write proxy header
-        stream
-            .inner()
-            .write_all(&header)
-            .await
-            .map_err(HopperError::Disconnected)?;
+        stream.write_buffer().put_slice(&header);
 
         // send along handshake as-is
         // og_handshake.as_ref().write_into(stream).await?;
-        stream.write_packet(og_handshake.as_ref()).await?;
+        stream.feed_raw_packet(og_handshake).await?;
 
         Ok(())
     }
@@ -220,7 +229,7 @@ impl ConnectionPrimer for Passthrough {
         og_handshake: DecodedPacket<Handshake>,
     ) -> Result<(), HopperError> {
         // just send along without doing anything
-        stream.write_packet(og_handshake.as_ref()).await?;
+        stream.feed_raw_packet(og_handshake).await?;
         Ok(())
     }
 }

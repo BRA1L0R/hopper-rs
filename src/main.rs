@@ -12,10 +12,11 @@ pub use crate::error::HopperError;
 mod config;
 pub mod error;
 pub mod metrics;
+pub mod protocol;
 mod server;
 
-#[allow(clippy::uninit_vec, unused_macros)]
-pub mod protocol;
+// #[allow(clippy::uninit_vec, unused_macros)]
+// pub mod protocol;
 
 // only returns a configuration if it's valid
 #[cfg(target_os = "linux")]
@@ -58,7 +59,7 @@ async fn run() -> Result<Infallible, HopperError> {
 
         select! {
             _ = server.listen(listener) => unreachable!(),
-            _ = tokio::signal::ctrl_c() => return Err(HopperError::Signal),
+            _ = tokio::signal::ctrl_c() => break Err(HopperError::Signal),
             newconfig = reload_valid() => { config = newconfig },
         }
     }

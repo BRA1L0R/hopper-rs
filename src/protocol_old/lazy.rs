@@ -3,7 +3,6 @@ use super::{
     error::ProtoError,
     packet::Packet,
 };
-use std::io::Cursor;
 
 /// Represents a decoded packet. While lazy packet may be
 /// decoded or still be raw, this struct guarantees that a decoding
@@ -32,6 +31,7 @@ impl<T: PacketId + Deserialize + 'static> TryFrom<Packet> for DecodedPacket<T> {
     fn try_from(packet: Packet) -> Result<Self, Self::Error> {
         let data = packet.deserialize_owned()?;
 
+        // WRONG!!!
         packet
             .is::<T>()
             .then_some(DecodedPacket { packet, data })
@@ -85,7 +85,7 @@ where
         match self.data {
             Some(ref data) => Ok(data),
             None => {
-                let data = self.packet.deserialize_owned::<T>()?;
+                let data = self.packet.deserialize_owned()?;
                 Ok(self.data.insert(data))
             }
         }
@@ -94,7 +94,7 @@ where
     pub fn decode(self) -> Result<DecodedPacket<T>, ProtoError> {
         let data = match self.data {
             Some(data) => data,
-            None => T::deserialize(&mut Cursor::new(&self.packet.data))?,
+            None => self.packet.deserialize_owned()?,
         };
 
         Ok(DecodedPacket {
