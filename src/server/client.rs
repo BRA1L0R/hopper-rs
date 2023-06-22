@@ -76,6 +76,7 @@ impl IncomingClient {
             .feed_packet(Disconnect::from_chat(&chat))
             .await
             .ok();
+        self.connection.flush().await.ok();
     }
 
     pub async fn disconnect_err(self, err: impl Error) {

@@ -65,14 +65,20 @@ async fn run() -> Result<Infallible, HopperError> {
     }
 }
 
-#[main]
-async fn main() {
+fn main() {
     SimpleLogger::new()
         .with_level(LevelFilter::Info)
         .env()
         .init()
         .unwrap();
 
-    let err = run().await.unwrap_err();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_io()
+        .enable_time()
+        .max_io_events_per_tick(4096)
+        .build()
+        .unwrap();
+
+    let err = rt.block_on(run()).unwrap_err();
     log::error!("{}", err)
 }

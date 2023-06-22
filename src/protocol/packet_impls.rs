@@ -9,7 +9,7 @@ pub struct JsonChat(String);
 
 impl JsonChat {
     pub fn new(message: &str) -> Self {
-        let json = json!({ "test": message });
+        let json = json!({ "text": message });
         Self(serde_json::to_string(&json).unwrap())
     }
 }

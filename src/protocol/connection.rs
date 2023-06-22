@@ -70,4 +70,10 @@ impl Connection {
     ) -> Result<(), ConnectionError> {
         self.inner.feed(packet).await.map_err(Into::into)
     }
+
+    pub async fn flush(&mut self) -> Result<(), ConnectionError> {
+        <Codec as SinkExt<&RawPacket>>::flush(&mut self.inner)
+            .await
+            .map_err(Into::into)
+    }
 }
