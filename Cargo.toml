@@ -3,9 +3,6 @@ name = "hopper"
 version = "0.5.0"
 edition = "2021"
 
-# [features]
-# buffered = []
-
 [profile.release]
 debug = 0
 strip = "symbols"
