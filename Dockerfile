@@ -7,9 +7,6 @@ WORKDIR /hopper
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
-# proc macros
-COPY ./hopper-macros ./hopper-macros
-
 # cache deps
 RUN cargo build --release 
 
