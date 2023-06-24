@@ -797,6 +797,8 @@ dependencies = [
 [[package]]
 name = "netherite"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc5b06bcb4246223024a2df3bb99f48fe8ea0a335e160d784e15e048f3270336"
 dependencies = [
  "bytes",
  "futures",
@@ -809,6 +811,8 @@ dependencies = [
 [[package]]
 name = "netherite-derive"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fe025d507abb4c87bd08a0186df8538b8366451ec50b16c31742b9c35c24610"
 dependencies = [
  "quote",
  "syn 2.0.18",

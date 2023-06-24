@@ -5,7 +5,7 @@ use log::LevelFilter;
 use metrics::injector::EmptyInjector;
 use server::Hopper;
 use simple_logger::SimpleLogger;
-use tokio::{main, net::TcpListener, select};
+use tokio::{net::TcpListener, select};
 
 pub use crate::error::HopperError;
 
@@ -75,7 +75,6 @@ fn main() {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_io()
         .enable_time()
-        .max_io_events_per_tick(4096)
         .build()
         .unwrap();
 

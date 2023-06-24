@@ -7,6 +7,7 @@ use netherite::{
     DeError, Serialize,
 };
 use thiserror::Error;
+
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 
@@ -48,8 +49,16 @@ impl Connection {
         self.inner.read_buffer()
     }
 
-    pub fn into_inner(self) -> Codec {
-        self.inner
+    fn is_detachable(&self) -> bool {
+        self.inner.read_buffer().is_empty() && self.inner.write_buffer().is_empty()
+    }
+
+    /// Downgrades this socket into a raw `TcpStream`.
+    /// Note: all internal buffers must be empty to
+    /// avoid any data losses
+    pub fn into_socket(self) -> TcpStream {
+        debug_assert!(self.is_detachable());
+        self.inner.into_inner()
     }
 
     pub async fn read_packet(&mut self) -> Result<RawPacket, ConnectionError> {

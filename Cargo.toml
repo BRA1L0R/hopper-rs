@@ -12,6 +12,8 @@ strip = "symbols"
 lto = true
 
 [dependencies]
+netherite = "0.1.0"
+
 async-trait = "0.1"
 tokio = { version = "1.19", features = ["rt-multi-thread", "net", "macros", "io-util", "sync", "time", "signal"] }
 influxdb2 = { version = "0.2" }
@@ -27,6 +29,5 @@ uuid = { version = "1.1" }
 md5 = { version = "0.7" } 
 hostname = "0.3"
 proxy-protocol = "0.5.0" 
-netherite = { path = "../mc-protocol" }
 tokio-util = { version = "0.7.8", features = ["codec"] }
 bytes = "1.4.0"

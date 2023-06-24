@@ -1,26 +1,16 @@
 pub mod forwarding;
+mod piping;
 
-use crate::{
-    protocol::connection::{Codec, Connection, ConnectionError},
-    HopperError,
+use crate::HopperError;
+
+use self::{
+    forwarding::{BungeeCord, ForwardStrategy, Passthrough, ProxyProtocol, RealIP},
+    piping::{copy_bidirectional, flush_bidirectional},
 };
-
-use self::forwarding::{BungeeCord, ForwardStrategy, Passthrough, ProxyProtocol, RealIP};
 
 use super::{
     backend::{Backend, Connected},
     client::{IncomingClient, NextState},
-};
-
-use futures::SinkExt;
-use netherite::packet::RawPacket;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{
-        tcp::{OwnedReadHalf, OwnedWriteHalf},
-        TcpStream,
-    },
-    select,
 };
 
 pub struct Bridge {
@@ -93,68 +83,4 @@ impl Bridge {
         let transferred = copy_bidirectional(server, client).await;
         Ok(transferred)
     }
-}
-
-async fn flush_bidirectional(
-    client: Connection,
-    server: Connection,
-) -> Result<(TcpStream, TcpStream), ConnectionError> {
-    let mut client = client.into_inner();
-    let mut server = server.into_inner();
-
-    client
-        .write_buffer_mut()
-        .extend_from_slice(server.read_buffer());
-
-    server
-        .write_buffer_mut()
-        .extend_from_slice(client.read_buffer());
-
-    <Codec as SinkExt<&RawPacket>>::flush(&mut client).await?;
-    <Codec as SinkExt<&RawPacket>>::flush(&mut server).await?;
-
-    debug_assert!(server.write_buffer().is_empty());
-    debug_assert!(client.write_buffer().is_empty());
-
-    Ok((client.into_inner(), server.into_inner()))
-}
-
-/// Uses an external transferred counter so in an event of an error or
-/// when the future gets dropped by the select data still gets recorded
-async fn pipe(mut input: OwnedReadHalf, mut output: OwnedWriteHalf, transferred: &mut u64) {
-    // Accomodate the average MTU of tcp connections
-    let mut buffer = [0u8; 2048];
-
-    // read from the socket into the buffer, increment the transfer counter
-    // and then write all to the other end of the pipe
-    loop {
-        let size = match input.read(&mut buffer).await {
-            Ok(0) | Err(_) => break,
-            Ok(p) => p,
-        };
-
-        *transferred += size as u64; // always safe doing
-
-        if output.write_all(&buffer[..size]).await.is_err() {
-            break;
-        }
-    }
-}
-
-async fn copy_bidirectional(server: TcpStream, client: TcpStream) -> (u64, u64) {
-    let mut serverbound = 0;
-    let mut clientbound = 0;
-
-    let (rs, ws) = server.into_split();
-    let (rc, wc) = client.into_split();
-
-    // select ensures that when one pipe finishes
-    // the other one gets dropped. Fixes socket leak
-    // which kept sockets in a WAIT state forever
-    select! {
-        _ = pipe(rc, ws, &mut serverbound) => {},
-        _ = pipe(rs, wc, &mut clientbound) => {}
-    };
-
-    (serverbound, clientbound)
 }
