@@ -142,8 +142,10 @@ impl ConnectionPrimer for RealIP {
 
         // bungeecord and realip forwarding have a very similar structure
         // write!(handshake.server_address, "///{}", client.address).unwrap();
-        let realip_data = format!("{}///{}", server_address, self.player_addr);
+        let realip_data = format!("///{}", self.player_addr);
         server_address.insert_str(insert_index, &realip_data);
+
+        println!("{server_address}");
 
         let handshake = NewHandshake {
             protocol_version,

@@ -84,9 +84,11 @@ pub struct NewHandshake {
 
 impl From<Handshake> for NewHandshake {
     fn from(value: Handshake) -> Self {
+        let server_address = value.server_address.to_string();
+
         NewHandshake {
             protocol_version: value.protocol_version,
-            server_address: value.server_address.to_string(),
+            server_address,
             server_port: value.server_port,
             next_state: value.next_state,
         }

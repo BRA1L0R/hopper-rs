@@ -1,3 +1,4 @@
+use bytes::BufMut;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
@@ -9,8 +10,8 @@ use tokio::{
 
 use crate::protocol::connection::{Connection, ConnectionError};
 
-async fn flush(into: &mut Connection, from: &Connection) -> Result<(), ConnectionError> {
-    into.write_buffer().extend_from_slice(from.read_buffer());
+async fn flush(into: &mut Connection, from: &mut Connection) -> Result<(), ConnectionError> {
+    into.write_buffer().put(from.read_buffer());
     into.flush().await
 }
 
@@ -18,8 +19,8 @@ pub async fn flush_bidirectional(
     mut client: Connection,
     mut server: Connection,
 ) -> Result<(TcpStream, TcpStream), ConnectionError> {
-    flush(&mut client, &server).await?;
-    flush(&mut server, &client).await?;
+    flush(&mut client, &mut server).await?;
+    flush(&mut server, &mut client).await?;
 
     Ok((client.into_socket(), server.into_socket()))
 }

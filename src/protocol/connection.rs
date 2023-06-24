@@ -45,8 +45,8 @@ impl Connection {
         self.inner.write_buffer_mut()
     }
 
-    pub fn read_buffer(&self) -> &BytesMut {
-        self.inner.read_buffer()
+    pub fn read_buffer(&mut self) -> &mut BytesMut {
+        self.inner.read_buffer_mut()
     }
 
     fn is_detachable(&self) -> bool {
