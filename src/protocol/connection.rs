@@ -4,7 +4,7 @@ use netherite::{
     codec::{CodecError, MinecraftCodec},
     encoding::packetid::PacketId,
     packet::RawPacket,
-    DeError, Serialize,
+    Serialize,
 };
 use thiserror::Error;
 
@@ -12,15 +12,6 @@ use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 
 pub type Codec = Framed<TcpStream, MinecraftCodec>;
-
-#[derive(Debug, Error)]
-pub enum ProtoError {
-    #[error("invalid packet id")]
-    Id,
-
-    #[error("error decoding: {0}")]
-    Decode(#[from] DeError),
-}
 
 #[derive(Debug, Error)]
 pub enum ConnectionError {

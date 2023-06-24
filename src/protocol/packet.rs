@@ -1,8 +1,16 @@
 use std::ops::Deref;
 
-use netherite::{encoding::packetid::PacketId, packet::RawPacket, Deserialize};
+use netherite::{encoding::packetid::PacketId, packet::RawPacket, DeError, Deserialize};
+use thiserror::Error;
 
-use super::connection::ProtoError;
+#[derive(Debug, Error)]
+pub enum ProtoError {
+    #[error("invalid packet id")]
+    Id,
+
+    #[error("error decoding: {0}")]
+    Decode(#[from] DeError),
+}
 
 pub struct DecodedPacket<T> {
     packet: RawPacket,

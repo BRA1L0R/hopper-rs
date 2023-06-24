@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::{
     config::ServerConfigError,
-    protocol::connection::{ConnectionError, ProtoError},
+    protocol::{connection::ConnectionError, packet::ProtoError},
     server::router::RouterError,
 };
 
@@ -23,7 +23,6 @@ pub enum HopperError {
     #[error("unable to connect to backend server: {0}")]
     Connect(std::io::Error),
 
-    // Server(#[from] server::)
     #[error("one of the two parties took too long to respond")]
     TimeOut,
 
