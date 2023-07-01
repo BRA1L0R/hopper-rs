@@ -3,6 +3,9 @@ name = "hopper"
 version = "0.5.0"
 edition = "2021"
 
+[features]
+zerocopy = ["libc"]
+
 [profile.release]
 debug = 0
 strip = "symbols"
@@ -28,3 +31,4 @@ hostname = "0.3"
 proxy-protocol = "0.5.0" 
 tokio-util = { version = "0.7.8", features = ["codec"] }
 bytes = "1.4.0"
+libc = { version = "0.2.147", optional = true }
