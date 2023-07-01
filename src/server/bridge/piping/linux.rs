@@ -4,7 +4,7 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
-use libc::{O_NONBLOCK, SPLICE_F_MORE, SPLICE_F_NONBLOCK};
+use libc::{O_NONBLOCK, SPLICE_F_NONBLOCK};
 
 #[repr(C)]
 pub struct Pipe {

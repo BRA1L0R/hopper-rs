@@ -1,9 +1,10 @@
 [package]
 name = "hopper"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 
 [features]
+default = ["zerocopy"]
 zerocopy = ["libc"]
 
 [profile.release]

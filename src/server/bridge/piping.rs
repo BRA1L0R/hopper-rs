@@ -8,7 +8,7 @@ use tokio::{
     select,
 };
 
-#[cfg(zerocopy)]
+#[cfg(feature = "zerocopy")]
 mod linux;
 
 use crate::protocol::connection::{Connection, ConnectionError};
@@ -30,7 +30,7 @@ pub async fn flush_bidirectional(
 
 /// Uses an external transferred counter so in an event of an error or
 /// when the future gets dropped by the select data still gets recorded
-#[cfg(not(zerocopy))]
+#[cfg(not(feature = "zerocopy"))]
 async fn pipe(mut input: OwnedReadHalf, mut output: OwnedWriteHalf, transferred: &mut u64) {
     // Accomodate the average MTU of tcp connections
     let mut buffer = [0u8; 2048];
@@ -51,22 +51,48 @@ async fn pipe(mut input: OwnedReadHalf, mut output: OwnedWriteHalf, transferred:
     }
 }
 
-#[cfg(zerocopy)]
+#[cfg(all(feature = "zerocopy", not(target_family = "unix")))]
+compile_error!("feature zerocopy is only supported on unix systems");
+
+#[cfg(feature = "zerocopy")]
 async fn pipe(
     mut input: OwnedReadHalf,
     mut output: OwnedWriteHalf,
     transferred: &mut u64,
 ) -> std::io::Result<()> {
-    use std::os::fd::AsFd;
+    use std::{io::ErrorKind, os::fd::AsFd};
 
     let mut pipe = linux::Pipe::new().unwrap();
+    let mut exitflag = false;
+
+    macro_rules! splice_all {
+        ($exitflag:tt, $splice:expr) => {
+            match $splice {
+                Ok(bytes) => bytes,
+                Err(e) if e.kind() == ErrorKind::WouldBlock => break,
+                Err(_) => {
+                    $exitflag = true;
+                    break;
+                }
+            }
+        };
+    }
 
     loop {
         let _ = input.read(&mut []).await?;
-        while pipe.splice_into(input.as_ref().as_fd()).is_ok() {}
+        loop {
+            splice_all!(exitflag, pipe.splice_into(input.as_ref().as_fd()));
+        }
 
         let _ = output.write(&[]).await?;
-        while pipe.splice_out(output.as_ref().as_fd()).is_ok() {}
+        loop {
+            let bytes = splice_all!(exitflag, pipe.splice_out(output.as_ref().as_fd()));
+            *transferred += bytes as u64;
+        }
+
+        if exitflag {
+            break Ok(());
+        }
     }
 }
 
