@@ -6,7 +6,7 @@ use futures::stream;
 use influxdb2::models::DataPoint;
 
 pub struct InfluxInjector {
-    pub hostname: String,
+    pub host: String,
     pub bucket: String,
     pub client: influxdb2::Client,
 }
@@ -23,23 +23,23 @@ impl MetricsInjector for InfluxInjector {
                     total_pings,
                     total_game,
                     open_connections,
-                    serverbound_bandwidth,
-                    clientbound_bandwidth,
+                    serverbound_traffic,
+                    clientbound_traffic,
                 } = *metrics;
 
                 DataPoint::builder("traffic")
-                    .tag("hostname", &self.hostname)
+                    .tag("host", &self.host)
                     .tag("destination_hostname", connecting_host.deref())
                     .field("total_pings", i64::try_from(total_pings).unwrap())
                     .field("total_game", i64::try_from(total_game).unwrap())
                     .field("open_connections", i64::try_from(open_connections).unwrap())
                     .field(
-                        "serverbound_bandwidth",
-                        i64::try_from(serverbound_bandwidth).unwrap(),
+                        "serverbound_traffic",
+                        i64::try_from(serverbound_traffic).unwrap(),
                     )
                     .field(
-                        "clientbound_bandwidth",
-                        i64::try_from(clientbound_bandwidth).unwrap(),
+                        "clientbound_traffic",
+                        i64::try_from(clientbound_traffic).unwrap(),
                     )
                     .build()
                     .unwrap()

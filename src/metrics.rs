@@ -55,8 +55,39 @@ pub struct HostnameCounter {
 
     open_connections: u64,
 
-    serverbound_bandwidth: u64,
-    clientbound_bandwidth: u64,
+    serverbound_traffic: u64,
+    clientbound_traffic: u64,
+}
+
+impl HostnameCounter {
+    pub fn apply_event(&mut self, event: &Event) {
+        match event.event_type {
+            EventType::Connect => {
+                match event.information.state {
+                    State::Login => self.total_game = self.total_game.wrapping_add(1),
+                    State::Status => self.total_pings = self.total_pings.wrapping_add(1),
+                }
+
+                self.open_connections = self
+                    .open_connections
+                    .checked_add(1)
+                    .expect("open connections exceeded u64::MAX")
+            }
+            EventType::BandwidthReport {
+                serverbound,
+                clientbound,
+            } => {
+                self.clientbound_traffic = self.clientbound_traffic.wrapping_add(clientbound);
+                self.serverbound_traffic = self.serverbound_traffic.wrapping_add(serverbound);
+            }
+            EventType::Disconnect => {
+                self.open_connections = self
+                    .open_connections
+                    .checked_sub(1)
+                    .expect("open connections to be at least 1")
+            }
+        }
+    }
 }
 
 #[allow(clippy::mutable_key_type)] // allowed for bytes::Bytes
@@ -97,33 +128,21 @@ impl Metrics {
         loop {
             let event = select! {
                 biased;
+                Some(event) = receiver.recv() => event,
                 _ = register_interval.tick() => {
                     if let Err(err) = injector.log(&counters).await { log::error!("InfluxDB reported an error: {err}") };
                     continue
                 },
-                Some(event) = receiver.recv() => event,
             };
 
-            let counters = counters.entry(event.information.hostname).or_default();
+            let counter = match counters.get_mut(&event.information.hostname) {
+                Some(counter) => counter,
+                None => counters
+                    .entry(event.information.hostname.clone())
+                    .or_default(),
+            };
 
-            match event.event_type {
-                EventType::Connect => {
-                    match event.information.state {
-                        State::Status => counters.total_pings += 1,
-                        State::Login => counters.total_game += 1,
-                    }
-
-                    counters.open_connections += 1
-                } // TODO: replace with safer alternative (due to wrapping)
-                EventType::Disconnect => counters.open_connections -= 1,
-                EventType::BandwidthReport {
-                    serverbound,
-                    clientbound,
-                } => {
-                    counters.serverbound_bandwidth += serverbound;
-                    counters.clientbound_bandwidth += clientbound;
-                }
-            }
+            counter.apply_event(&event)
         }
     }
 }

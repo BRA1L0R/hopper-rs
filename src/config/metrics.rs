@@ -43,7 +43,7 @@ impl MetricsConfig {
                 Box::new(InfluxInjector {
                     client,
                     bucket,
-                    hostname,
+                    host: hostname,
                 })
             }
         }

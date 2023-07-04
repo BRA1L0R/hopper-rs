@@ -161,15 +161,15 @@ Hopper will start logging every **5 seconds** according to this data format:
 **Measurement "traffic":**
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| hostname | Tag | system (or custom if specified) hostname generating this metric |
-| dest_hostname | Tag | the hostname clients connected corresponding to these metrics |
-| clientbound_bandwidth | Value (int) | the traffic this host generated server=>client |
-| serverbound_bandwidth | Value (int) | same as above, but client=>server |
+| host | Tag | system (or custom if specified) hostname generating this metric |
+| destination_hostname | Tag | the hostname clients connected corresponding to these metrics |
+| clientbound_traffic | Value (int) | the traffic this host generated server=>client |
+| serverbound_traffic | Value (int) | same as above, but client=>server |
 | open_connections | Value(int) | connections opened in the moment of the measurement |
 | total_game | Value(int) | people who attemped or succeded joining this server |
 | total_ping | Value(int) | people who pinged this server |
 
-_NOTE: As counters reset through restarts, data manipulation using the influx query language allows you to aggregate rows and get persistent results._
+_NOTE: Since counters reset through restarts, data manipulation using the influx query language allows you to aggregate rows and get persistent results._
 
 ## How to run
 
