@@ -17,10 +17,8 @@ RUN rm ./target/release/deps/hopper*
 RUN cargo build --release
 
 # final runnable image
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 COPY --from=build /hopper/target/release/hopper .
-
-RUN apt-get update && apt-get install -y libssl-dev
 
 RUN chmod a+x ./hopper
 CMD ["./hopper"]
